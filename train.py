@@ -87,7 +87,6 @@ def train_sam(
                 val_metrics = validate(fabric, model, val_dataloader, epoch)
                 fabric.log_dict(val_metrics, step=epoch * (iter + 1))
                 validated = True
-            fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]')
 
             data_time.update(time.time() - end)
             images, bboxes, gt_masks = data
