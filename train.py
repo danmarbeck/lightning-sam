@@ -88,7 +88,7 @@ def train_sam(
                 fabric.log_dict(val_metrics, step=epoch * (iter + 1))
                 validated = True
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]')
-            """
+
             data_time.update(time.time() - end)
             images, bboxes, gt_masks = data
             batch_size = images.size(0)
@@ -130,7 +130,7 @@ def train_sam(
                              "batch_time": batch_time.val,
                              "data_time": data_time.val
                              }, step=epoch * (iter + 1))
-            """
+
         fabric.log_dict({"focal_loss": focal_losses.val,
                          "dice_loss": dice_losses.val,
                          "iou_loss": iou_losses.val,
