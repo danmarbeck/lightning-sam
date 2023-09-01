@@ -7,6 +7,7 @@ dataset:
     root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/val
 eval_interval: 2
 model:
+  name: Model
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
@@ -18,10 +19,10 @@ num_epochs: 30
 num_workers: 4
 opt:
   decay_factor: 10
-  learning_rate: 0.0008
+  learning_rate: 0.00008
   steps:
   - 60000
   - 86666
   warmup_steps: 250
-  weight_decay: 0.0001
+  weight_decay: 0.1
 out_dir: out/training

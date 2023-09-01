@@ -1,15 +1,13 @@
 batch_size: 3
 dataset:
-  type: coco
+  type: pascal_embedding
   train:
-    annotation_file: /data/coco/annotations/instances_train2017.json
-    root_dir: /data/coco/train2017
+    root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/train
   val:
-    annotation_file: /data/coco/annotations/instances_val2017.json
-    root_dir: /data/coco/val2017
+    root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/val
 eval_interval: 2
 model:
-  name: Model
+  name: PrecomputedEmbeddingModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
@@ -17,8 +15,8 @@ model:
     prompt_encoder: true
   type: vit_h
 num_devices: 2
-num_epochs: 2
-num_workers: 0
+num_epochs: 30
+num_workers: 4
 opt:
   decay_factor: 10
   learning_rate: 0.00008

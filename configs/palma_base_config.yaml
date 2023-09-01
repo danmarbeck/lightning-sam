@@ -20,10 +20,10 @@ num_epochs: 25
 num_workers: 2
 opt:
   decay_factor: 10
-  learning_rate: 0.0008
+  learning_rate: 0.00008
   steps:
   - 60000
   - 86666
   warmup_steps: 250
-  weight_decay: 0.0001
+  weight_decay: 0.1
 out_dir: /scratch/tmp/d_beck26/sam_training/
