@@ -160,6 +160,12 @@ class PrecomputeModel(nn.Module):
     def get_predictor(self):
         return SamPredictor(self.model)
 
+    def get_img_size(self):
+        return self.model.image_encoder.img_size
+
+    def get_parameters(self):
+        return self.model.parameters()
+
 
 MODELS = {"PrecomputedEmbeddingModel": PrecomputedEmbeddingModel,
           "Model": Model,
