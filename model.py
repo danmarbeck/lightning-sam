@@ -1,3 +1,5 @@
+from itertools import chain
+
 import torch.nn as nn
 import torch.nn.functional as F
 from segment_anything import sam_model_registry
@@ -58,32 +60,11 @@ class Model(nn.Module):
     def get_predictor(self):
         return SamPredictor(self.model)
 
+    def get_img_size(self):
+        return self.model.image_encoder.img_size
 
-class PrecomputeModel(nn.Module):
-    """
-        Use this model to precompute image embeddings on your dataset for faster training.
-    """
-
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-
-    def setup(self):
-        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
-        self.model.eval()
-        for param in self.model.image_encoder.parameters():
-            param.requires_grad = False
-        for param in self.model.prompt_encoder.parameters():
-            param.requires_grad = False
-        for param in self.model.mask_decoder.parameters():
-            param.requires_grad = False
-
-    def forward(self, images):
-        image_embeddings = self.model.image_encoder(images)
-        return image_embeddings
-
-    def get_predictor(self):
-        return SamPredictor(self.model)
+    def get_parameters(self):
+        return self.model.parameters()
 
 
 class PrecomputedEmbeddingModel(nn.Module):
@@ -145,3 +126,41 @@ class PrecomputedEmbeddingModel(nn.Module):
 
     def get_predictor(self):
         return SamPredictor(self.full_model)
+
+    def get_img_size(self):
+        return self.full_model.image_encoder.img_size
+
+    def get_parameters(self):
+        return chain(*[self.prompt_encoder.parameters(), self.mask_decoder.parameters()])
+
+
+class PrecomputeModel(nn.Module):
+    """
+        Use this model to precompute image embeddings on your dataset for faster training.
+    """
+
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+
+    def setup(self):
+        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
+        self.model.eval()
+        for param in self.model.image_encoder.parameters():
+            param.requires_grad = False
+        for param in self.model.prompt_encoder.parameters():
+            param.requires_grad = False
+        for param in self.model.mask_decoder.parameters():
+            param.requires_grad = False
+
+    def forward(self, images):
+        image_embeddings = self.model.image_encoder(images)
+        return image_embeddings
+
+    def get_predictor(self):
+        return SamPredictor(self.model)
+
+
+MODELS = {"PrecomputedEmbeddingModel": PrecomputedEmbeddingModel,
+          "Model": Model,
+          }

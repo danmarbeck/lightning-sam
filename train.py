@@ -14,7 +14,7 @@ from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
 from losses import DiceLoss
 from losses import FocalLoss
-from model import Model
+from model import MODELS, Model
 from torch.utils.data import DataLoader
 from utils import AverageMeter
 from utils import calc_iou
@@ -98,8 +98,8 @@ def train_sam(
             loss_iou = torch.tensor(0., device=fabric.device)
             for pred_mask, gt_mask, iou_prediction in zip(pred_masks, gt_masks, iou_predictions):
                 batch_iou = calc_iou(pred_mask, gt_mask)
-                loss_focal += focal_loss(pred_mask, gt_mask, num_masks)
-                loss_dice += dice_loss(pred_mask, gt_mask, num_masks)
+                loss_focal += focal_loss(pred_mask, gt_mask) / num_masks
+                loss_dice += dice_loss(pred_mask, gt_mask) / num_masks
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
 
             loss_total = 20. * loss_focal + loss_dice + loss_iou
@@ -139,7 +139,7 @@ def train_sam(
                          }, step=epoch * (iter + 1))
 
 
-def configure_opt(cfg: Box, model: Model):
+def configure_opt(cfg: Box, model):
 
     def lr_lambda(step):
         if step < cfg.opt.warmup_steps:
@@ -151,7 +151,7 @@ def configure_opt(cfg: Box, model: Model):
         else:
             return 1 / (cfg.opt.decay_factor**2)
 
-    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
+    optimizer = torch.optim.AdamW(model.get_parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     return optimizer, scheduler
@@ -170,10 +170,10 @@ def main(cfg: Box) -> None:
         os.makedirs(cfg.out_dir, exist_ok=True)
 
     with fabric.device:
-        model = Model(cfg)
+        model = MODELS[cfg.model.name](cfg)
         model.setup()
 
-    train_data, val_data = load_datasets(cfg, model.model.image_encoder.img_size)
+    train_data, val_data = load_datasets(cfg, model.get_img_size())
     train_data = fabric._setup_dataloader(train_data)
     val_data = fabric._setup_dataloader(val_data)
 

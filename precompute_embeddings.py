@@ -18,7 +18,7 @@ def main(cfg: Box) -> None:
     model.setup()
     model = model.to(device=torch.device("cuda:0"))
 
-    train_data, val_data = load_datasets(cfg, model.model.image_encoder.img_size, return_path=True)
+    train_data, val_data = load_datasets(cfg, model.get_img_size(), return_path=True)
 
     model.eval()
 

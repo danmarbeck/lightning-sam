@@ -1,4 +1,4 @@
-batch_size: 3
+batch_size: 10
 dataset:
   type: pascal_embedding
   train:

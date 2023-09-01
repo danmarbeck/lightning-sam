@@ -151,13 +151,16 @@ class PascalVOCEmbeddingDataset(Dataset):
     """
         PascalVOCDataset for image-based gaze version of the dataset, using pre-computed embeddings
         @param root_dir: Path to folder containing the gaze images, masks and original etc. as folders, per class
+                        Should be located within the original pascal voc structure, 2 levels deeper, aka top level
+                        contains folders Annotations, JPEGImages etc.,
+                        and root_dir is <path_to_top_level>/<gaze_data_folder>/<split>/
     """
     def __init__(self, root_dir, transform=None, return_path=False):
         self.root_dir = root_dir
         self.transform = transform
         self.return_path = return_path
         self.image_dict = self._get_image_dict()
-        self.split = Path(self.root_dir).parent.name
+        self.split = Path(self.root_dir).name
 
         self.image_ids = list(self.image_dict.keys())
 
@@ -277,6 +280,7 @@ class ResizeAndPad:
 
 DATASETS = {"coco": COCODataset,
             "pascal": PascalVOCDataset,
+            "pascal_embedding": PascalVOCEmbeddingDataset,
             }
 
 
