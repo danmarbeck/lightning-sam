@@ -1,0 +1,27 @@
+batch_size: 3
+dataset:
+  type: pascal
+  train:
+    root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/train
+  val:
+    root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/val
+eval_interval: 2
+model:
+  checkpoint: checkpoints/sam_vit_h_4b8939.pth
+  freeze:
+    image_encoder: true
+    mask_decoder: false
+    prompt_encoder: true
+  type: vit_h
+num_devices: 2
+num_epochs: 30
+num_workers: 4
+opt:
+  decay_factor: 10
+  learning_rate: 0.0008
+  steps:
+  - 60000
+  - 86666
+  warmup_steps: 250
+  weight_decay: 0.0001
+out_dir: out/training

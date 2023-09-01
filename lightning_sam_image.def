@@ -1,0 +1,52 @@
+Bootstrap: docker
+From: ubuntu:20.04
+
+%help
+  Run meditrain stuff inside this.
+  tmux setw -g mouse on
+
+%labels
+  CREATOR Leon
+
+%post
+  apt-get -y update
+  apt-get -y upgrade
+  apt-get -y install python3.9
+  apt-get -y install python3-pip
+  apt-get -y install python3.9-dev
+  apt-get -y install build-essential cmake unzip pkg-config
+  apt-get -y install libjpeg-dev libpng-dev
+  apt-get -y install libavcodec-dev libavformat-dev libswscale-dev libv4l-dev
+  apt-get -y install libxvidcore-dev libx264-dev
+  apt-get -y install libsm6 libxext6 libxrender-dev
+  # read eps with pillow
+  apt-get -y install ghostscript
+  apt-get -y install git
+
+  #apt-get -y install libaec-dev libblosc-dev brotli
+  python3.9 -m pip install -U pip
+
+  python3.9 -m pip install jupyterlab matplotlib numpy h5py scikit-learn tqdm SimpleITK==2.1.1 pyyaml pillow tqdm flask
+  python3.9 -m pip install einops
+  python3.9 -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+  python3.9 -m pip install torchio==0.18.75 imageio pandas scipy==1.8.0 scikit-image
+  python3.9 -m pip install git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git
+  # set noninteractive installation
+  export DEBIAN_FRONTEND=noninteractive
+  # install tzdata package
+  apt-get install -y tzdata
+  # set your timezone
+  ln -fs /usr/share/zoneinfo/Europe/Berlin /etc/localtime
+  dpkg-reconfigure --frontend noninteractive tzdata
+
+  apt-get -y install git
+  apt-get -y install tmux
+  apt-get -y install vim
+  apt-get -y install nano
+  apt-get -y install wget
+  apt-get -y install htop
+
+  ln -s /usr/bin/python3.9 /usr/bin/python
+  git clone https://github.com/danmarbeck/lightning-sam.git
+  cd lightning-sam
+  pip install .

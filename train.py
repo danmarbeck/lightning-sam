@@ -1,5 +1,7 @@
+import argparse
 import os
 import time
+from pathlib import Path
 
 import lightning as L
 import segmentation_models_pytorch as smp
@@ -53,6 +55,8 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
         torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
     model.train()
 
+    return {"iou_val": ious.avg, "f1_avg": f1_scores.avg}
+
 
 def train_sam(
     cfg: Box,
@@ -80,9 +84,11 @@ def train_sam(
 
         for iter, data in enumerate(train_dataloader):
             if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
-                validate(fabric, model, val_dataloader, epoch)
+                val_metrics = validate(fabric, model, val_dataloader, epoch)
+                fabric.log_dict(val_metrics, step=epoch * (iter + 1))
                 validated = True
-
+            fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]')
+            """
             data_time.update(time.time() - end)
             images, bboxes, gt_masks = data
             batch_size = images.size(0)
@@ -117,6 +123,21 @@ def train_sam(
                          f' | Dice Loss [{dice_losses.val:.4f} ({dice_losses.avg:.4f})]'
                          f' | IoU Loss [{iou_losses.val:.4f} ({iou_losses.avg:.4f})]'
                          f' | Total Loss [{total_losses.val:.4f} ({total_losses.avg:.4f})]')
+            fabric.log_dict({"focal_loss": focal_losses.val,
+                             "dice_loss": dice_losses.val,
+                             "iou_loss": iou_losses.val,
+                             "total_loss": total_losses.val,
+                             "batch_time": batch_time.val,
+                             "data_time": data_time.val
+                             }, step=epoch * (iter + 1))
+            """
+        fabric.log_dict({"focal_loss": focal_losses.val,
+                         "dice_loss": dice_losses.val,
+                         "iou_loss": iou_losses.val,
+                         "total_loss": total_losses.val,
+                         "batch_time": batch_time.val,
+                         "data_time": data_time.val
+                         }, step=epoch * (iter + 1))
 
 
 def configure_opt(cfg: Box, model: Model):
@@ -141,7 +162,7 @@ def main(cfg: Box) -> None:
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
                       strategy="auto",
-                      loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
+                      loggers=[TensorBoardLogger(cfg.out_dir, name=cfg.config_name)])
     fabric.launch()
     fabric.seed_everything(1337 + fabric.global_rank)
 
@@ -164,4 +185,19 @@ def main(cfg: Box) -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Finetune SAM using the corresponding training config")
+    parser.add_argument("--config", default="configs/base_config.yaml", type=str,
+                        help="Path to .yaml file containing the config.")
+
+    args = parser.parse_args()
+    if args.config is not None:
+        try:
+            cfg = Box.from_yaml(filename=str(Path(args.config).absolute()))
+        except Exception as e:
+            print("Failed to load config:")
+            print(e)
+            print("Using default config instead")
+        cfg["config_name"] = Path(args.config).stem
+    else:
+        cfg["config_name"] = "internal_config"
     main(cfg)

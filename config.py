@@ -1,10 +1,10 @@
 from box import Box
 
 config = {
-    "num_devices": 4,
-    "batch_size": 12,
+    "num_devices": 2,
+    "batch_size": 3,
     "num_workers": 4,
-    "num_epochs": 20,
+    "num_epochs": 2,
     "eval_interval": 2,
     "out_dir": "out/training",
     "opt": {
@@ -16,7 +16,7 @@ config = {
     },
     "model": {
         "type": 'vit_h',
-        "checkpoint": "sam_vit_h_4b8939.pth",
+        "checkpoint": "checkpoints/sam_vit_h_4b8939.pth",
         "freeze": {
             "image_encoder": True,
             "prompt_encoder": True,
@@ -25,12 +25,12 @@ config = {
     },
     "dataset": {
         "train": {
-            "root_dir": "/coco/coco2017/train2017",
-            "annotation_file": "/coco/coco2017/annotations/instances_train2017.json"
+            "root_dir": "/data/coco/train2017",
+            "annotation_file": "/data/coco/annotations/instances_train2017.json"
         },
         "val": {
-            "root_dir": "/coco/coco2017/val2017",
-            "annotation_file": "/coco/coco2017/annotations/instances_val2017.json"
+            "root_dir": "/data/coco/val2017",
+            "annotation_file": "/data/coco/annotations/instances_val2017.json"
         }
     }
 }
