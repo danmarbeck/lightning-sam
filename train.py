@@ -158,6 +158,7 @@ def configure_opt(cfg: Box, model: Model):
 
 
 def main(cfg: Box) -> None:
+    Path(cfg.out_dir).mkdir(exist_ok=True, parents=True)
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
                       strategy="auto",
