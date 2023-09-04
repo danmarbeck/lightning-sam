@@ -1,0 +1,27 @@
+batch_size: 28
+dataset:
+  type: pascal_embedding
+  train:
+    root_dir: C:/Users/danie/PycharmProjects/data/PascalVOC2012/VOC2012/focused_gaze/train
+  val:
+    root_dir: C:/Users/danie/PycharmProjects/data/PascalVOC2012/VOC2012/focused_gaze/train
+eval_interval: 20
+model:
+  name: PrecomputedEmbeddingModel
+  checkpoint: checkpoints/sam_vit_h_4b8939.pth
+  freeze:
+    image_encoder: true
+    mask_decoder: false
+    prompt_encoder: true
+  type: vit_h
+num_devices: 2
+num_epochs: 120
+num_workers: 8
+opt:
+  decay_factor: 10
+  learning_rate: 0.00008
+  steps:
+  - 1500
+  warmup_steps: 250
+  weight_decay: 0.1
+out_dir: out/training

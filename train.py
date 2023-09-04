@@ -29,9 +29,9 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
 
     with torch.no_grad():
         for iter, data in enumerate(val_dataloader):
-            images, bboxes, gt_masks = data
+            images, prompt_input, gt_masks = data
             num_images = images.size(0)
-            pred_masks, _ = model(images, bboxes)
+            pred_masks, _ = model(images, prompt_input)
             for pred_mask, gt_mask in zip(pred_masks, gt_masks):
                 batch_stats = smp.metrics.get_stats(
                     pred_mask,
@@ -89,9 +89,9 @@ def train_sam(
                 validated = True
 
             data_time.update(time.time() - end)
-            images, bboxes, gt_masks = data
+            images, prompt_input, gt_masks = data
             batch_size = images.size(0)
-            pred_masks, iou_predictions = model(images, bboxes)
+            pred_masks, iou_predictions = model(images, prompt_input)
             num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
             loss_focal = torch.tensor(0., device=fabric.device)
             loss_dice = torch.tensor(0., device=fabric.device)
@@ -129,14 +129,6 @@ def train_sam(
                              "batch_time": batch_time.val,
                              "data_time": data_time.val
                              }, step=(epoch - 1) * len(train_dataloader) + iter)
-
-        fabric.log_dict({"focal_loss": focal_losses.val,
-                         "dice_loss": dice_losses.val,
-                         "iou_loss": iou_losses.val,
-                         "total_loss": total_losses.val,
-                         "batch_time": batch_time.val,
-                         "data_time": data_time.val
-                         }, step=epoch * (iter + 1))
 
 
 def configure_opt(cfg: Box, model):

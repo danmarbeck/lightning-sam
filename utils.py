@@ -8,22 +8,27 @@ from model import Model
 from torchvision.utils import draw_bounding_boxes
 from torchvision.utils import draw_segmentation_masks
 from tqdm import tqdm
-
+from collections import deque
 
 class AverageMeter:
     """Computes and stores the average and current value."""
 
-    def __init__(self):
+    def __init__(self, window=10):
         self.reset()
+        self.window_size = window
+        self.mavg_buffer = deque(maxlen=self.window_size)
 
     def reset(self):
         self.val = 0
         self.avg = 0
+        self.moving_avg = 0
         self.sum = 0
         self.count = 0
 
     def update(self, val, n=1):
         self.val = val
+        self.mavg_buffer.append(val)
+        self.moving_avg = sum(self.mavg_buffer) / self.window_size
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
