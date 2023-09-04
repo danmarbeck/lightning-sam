@@ -1,13 +1,13 @@
 batch_size: 28
 dataset:
-  type: pascal_embedding
+  type: pascal_embedding_gaze
   train:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
   val:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
 eval_interval: 20
 model:
-  name: PrecomputedEmbeddingModel
+  name: PrecomputedEmbeddingGazeModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
