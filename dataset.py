@@ -85,6 +85,7 @@ class PascalVOCDataset(Dataset):
             Constructs a dict, keys are image ids, dict contains list of bboxes and paths to additional info, and saves it to disk
         """
         image_dict = {}
+        print("Constructing image dict...")
 
         bbox_regex = re.compile("\d{4}_\d{6}_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
 
@@ -176,6 +177,7 @@ class PascalVOCEmbeddingDataset(Dataset):
             Constructs a dict, keys are image ids, dict contains list of bboxes and paths to additional info, and saves it to disk
         """
         image_dict = {}
+        print("Constructing image dict...")
 
         bbox_regex = re.compile("\d{4}_\d{6}_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
 

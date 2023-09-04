@@ -66,6 +66,9 @@ class Model(nn.Module):
     def get_parameters(self):
         return self.model.parameters()
 
+    def get_full_model(self):
+        return self.model
+
 
 class PrecomputedEmbeddingModel(nn.Module):
 
@@ -133,6 +136,9 @@ class PrecomputedEmbeddingModel(nn.Module):
     def get_parameters(self):
         return chain(*[self.prompt_encoder.parameters(), self.mask_decoder.parameters()])
 
+    def get_full_model(self):
+        return self.full_model
+
 
 class PrecomputeModel(nn.Module):
     """
@@ -165,6 +171,9 @@ class PrecomputeModel(nn.Module):
 
     def get_parameters(self):
         return self.model.parameters()
+
+    def get_full_model(self):
+        return self.model
 
 
 MODELS = {"PrecomputedEmbeddingModel": PrecomputedEmbeddingModel,

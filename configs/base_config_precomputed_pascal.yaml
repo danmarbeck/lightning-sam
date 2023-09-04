@@ -1,11 +1,11 @@
-batch_size: 10
+batch_size: 28
 dataset:
   type: pascal_embedding
   train:
-    root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/train
+    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
   val:
-    root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/val
-eval_interval: 2
+    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
+eval_interval: 5
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
@@ -15,8 +15,8 @@ model:
     prompt_encoder: true
   type: vit_h
 num_devices: 2
-num_epochs: 30
-num_workers: 4
+num_epochs: 80
+num_workers: 8
 opt:
   decay_factor: 10
   learning_rate: 0.00008

@@ -50,7 +50,7 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
     fabric.print(f'Validation [{epoch}]: Mean IoU: [{ious.avg:.4f}] -- Mean F1: [{f1_scores.avg:.4f}]')
 
     fabric.print(f"Saving checkpoint to {cfg.out_dir}")
-    state_dict = model.model.state_dict()
+    state_dict = model.get_full_model().state_dict()
     if fabric.global_rank == 0:
         torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
     model.train()
@@ -85,7 +85,7 @@ def train_sam(
         for iter, data in enumerate(train_dataloader):
             if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
                 val_metrics = validate(fabric, model, val_dataloader, epoch)
-                fabric.log_dict(val_metrics, step=epoch * (iter + 1))
+                fabric.log_dict(val_metrics, step=(epoch - 1) * len(train_dataloader))
                 validated = True
 
             data_time.update(time.time() - end)
@@ -128,7 +128,7 @@ def train_sam(
                              "total_loss": total_losses.val,
                              "batch_time": batch_time.val,
                              "data_time": data_time.val
-                             }, step=epoch * (iter + 1))
+                             }, step=(epoch - 1) * len(train_dataloader) + iter)
 
         fabric.log_dict({"focal_loss": focal_losses.val,
                          "dice_loss": dice_losses.val,
@@ -163,6 +163,8 @@ def main(cfg: Box) -> None:
                       devices=cfg.num_devices,
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name=cfg.config_name)])
+    cfg.out_dir = Path(cfg.out_dir, cfg.config_name)
+    cfg.out_dir.mkdir(exist_ok=True, parents=True)
     fabric.launch()
     fabric.seed_everything(1337 + fabric.global_rank)
 
