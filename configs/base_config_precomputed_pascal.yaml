@@ -1,10 +1,12 @@
-batch_size: 28
+batch_size: 24
 dataset:
-  type: pascal_embedding
+  type: pascal
   train:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
+    use_embeddings: true
   val:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
+    use_embeddings: true
 eval_interval: 5
 save_interval: 20
 model:
@@ -17,13 +19,13 @@ model:
   type: vit_h
 num_devices: 2
 num_epochs: 120
-num_workers: 8
+num_workers: 6
 opt:
   decay_factor: 10
   learning_rate: 0.00008
   steps:
   - 2000
   - 3000
-  warmup_steps: 250
+  warmup_steps: 30
   weight_decay: 0.1
 out_dir: out/training

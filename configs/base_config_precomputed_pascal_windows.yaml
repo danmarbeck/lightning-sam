@@ -3,8 +3,10 @@ dataset:
   type: pascal_embedding
   train:
     root_dir: C:/Users/danie/PycharmProjects/data/PascalVOC2012/VOC2012/focused_gaze/train
+    use_embeddings: true
   val:
     root_dir: C:/Users/danie/PycharmProjects/data/PascalVOC2012/VOC2012/focused_gaze/train
+    use_embeddings: true
 eval_interval: 20
 model:
   name: PrecomputedEmbeddingModel
