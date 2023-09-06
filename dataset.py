@@ -263,7 +263,7 @@ class PascalVOCEmbeddingGazeDataset(Dataset):
     def _get_image_dict(self):
 
         if Path(self.root_dir, "sam_gaze_dataset_info_dict.yaml").exists():
-            return yaml.load(open(Path(self.root_dir, "sam_dataset_info_dict.yaml"), "r"), yaml.FullLoader)
+            return yaml.load(open(Path(self.root_dir, "sam_gaze_dataset_info_dict.yaml"), "r"), yaml.FullLoader)
         else:
             return self._construct_image_dict()
 
@@ -341,9 +341,9 @@ class PascalVOCEmbeddingGazeDataset(Dataset):
         gaze_masks = np.stack(gaze_masks, axis=0)
 
         if self.return_path:
-            return image_embedding, gaze_masks, torch.tensor(masks).float(), image_path
+            return image_embedding, torch.tensor(gaze_masks).float(), torch.tensor(masks).float(), image_path
         else:
-            return image_embedding, gaze_masks, torch.tensor(masks).float()
+            return image_embedding, torch.tensor(gaze_masks).float(), torch.tensor(masks).float()
 
 
 def collate_fn(batch):
@@ -357,7 +357,7 @@ class ResizeAndPad:
     def __init__(self, target_size):
         self.target_size = target_size
         self.transform = ResizeLongestSide(target_size)
-        self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=0.15)
+        self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
         self.to_tensor = transforms.ToTensor()
 
     def __call__(self, image, masks, bboxes, gaze_masks=None):
@@ -366,8 +366,8 @@ class ResizeAndPad:
         image = self.transform.apply_image(image)
         masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
         if gaze_masks is not None:
-            gaze_masks = [torch.tensor(self.transform.apply_image(gaze_mask)) for gaze_mask in gaze_masks]
-            gaze_masks = [self.gaze_transform(gaze_mask) for gaze_mask in gaze_masks]
+            gaze_masks = [torch.tensor(self.transform.apply_image(gaze_mask))[:, :, 0].bool().float() for gaze_mask in gaze_masks]
+            gaze_masks = [self.gaze_transform(gaze_mask[None, ...]) for gaze_mask in gaze_masks]
         image = self.to_tensor(image)
 
         # Pad image and masks to form a square
@@ -381,7 +381,7 @@ class ResizeAndPad:
         masks = [transforms.Pad(padding)(mask) for mask in masks]
         if gaze_masks is not None:
             gaze_masks = [transforms.Pad(padding)(gaze_mask) for gaze_mask in gaze_masks]
-            gaze_masks = [transforms.Resize(self.target_size // 4)(gaze_mask) for gaze_mask in gaze_masks]
+            gaze_masks = [transforms.Resize(self.target_size // 4, antialias=True)(gaze_mask) for gaze_mask in gaze_masks]
 
         # Adjust bounding boxes
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
