@@ -5,7 +5,8 @@ dataset:
     root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/train
   val:
     root_dir: /data/PascalVOC2012/VOC2012/focused_gaze/val
-eval_interval: 2
+eval_interval: 5
+save_interval: 20
 model:
   name: Model
   checkpoint: checkpoints/sam_vit_h_4b8939.pth

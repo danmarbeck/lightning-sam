@@ -5,7 +5,8 @@ dataset:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
   val:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
-eval_interval: 20
+eval_interval: 5
+save_interval: 20
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
@@ -21,7 +22,8 @@ opt:
   decay_factor: 10
   learning_rate: 0.00008
   steps:
-  - 1500
+  - 2000
+  - 3000
   warmup_steps: 250
   weight_decay: 0.1
 out_dir: out/training
