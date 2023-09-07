@@ -153,6 +153,7 @@ def main(cfg: Box) -> None:
     Path(cfg.out_dir).mkdir(exist_ok=True, parents=True)
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
+                      num_nodes=cfg.num_nodes,
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name=cfg.config_name)])
     cfg.out_dir = Path(cfg.out_dir, cfg.config_name)
@@ -194,4 +195,6 @@ if __name__ == "__main__":
         cfg["config_name"] = Path(args.config).stem
     else:
         cfg["config_name"] = "internal_config"
+    if "num_nodes" not in cfg.keys():
+        cfg["num_nodes"] = 1
     main(cfg)
