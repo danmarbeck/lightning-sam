@@ -7,7 +7,7 @@ dataset:
     prompt_types:
       - masks
   val:
-    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
+    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
     use_embeddings: true
     prompt_types:
       - masks
@@ -28,8 +28,8 @@ opt:
   decay_factor: 10
   learning_rate: 0.0008
   steps:
-  - 2000
-  - 2500
+  - 1500
+  - 4000
   warmup_steps: 30
   weight_decay: 0.1
 out_dir: out/training

@@ -16,6 +16,7 @@ from losses import DiceLoss
 from losses import FocalLoss
 from model import MODELS, Model
 from torch.utils.data import DataLoader
+from torch.distributed.optim import ZeroRedundancyOptimizer
 from utils import AverageMeter
 from utils import calc_iou
 
@@ -59,13 +60,13 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
 
 
 def train_sam(
-    cfg: Box,
-    fabric: L.Fabric,
-    model: Model,
-    optimizer: _FabricOptimizer,
-    scheduler: _FabricOptimizer,
-    train_dataloader: DataLoader,
-    val_dataloader: DataLoader,
+        cfg: Box,
+        fabric: L.Fabric,
+        model: Model,
+        optimizer: _FabricOptimizer,
+        scheduler: _FabricOptimizer,
+        train_dataloader: DataLoader,
+        val_dataloader: DataLoader,
 ):
     """The SAM training loop."""
 
@@ -115,7 +116,7 @@ def train_sam(
             iou_losses.update(loss_iou.item(), batch_size)
             total_losses.update(loss_total.item(), batch_size)
 
-            fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
+            fabric.print(f'Epoch: [{epoch}][{iter + 1}/{len(train_dataloader)}]'
                          f' | Time [{batch_time.val:.3f}s ({batch_time.moving_avg:.3f}s)]'
                          f' | Data [{data_time.val:.3f}s ({data_time.moving_avg:.3f}s)]'
                          f' | Focal Loss [{focal_losses.val:.4f} ({focal_losses.moving_avg:.4f})]'
@@ -132,7 +133,6 @@ def train_sam(
 
 
 def configure_opt(cfg: Box, model):
-
     def lr_lambda(step):
         if step < cfg.opt.warmup_steps:
             return step / cfg.opt.warmup_steps
@@ -141,9 +141,10 @@ def configure_opt(cfg: Box, model):
         elif step < cfg.opt.steps[1]:
             return 1 / cfg.opt.decay_factor
         else:
-            return 1 / (cfg.opt.decay_factor**2)
+            return 1 / (cfg.opt.decay_factor ** 2)
 
-    optimizer = torch.optim.AdamW(model.get_parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
+    optimizer = ZeroRedundancyOptimizer(model.get_parameters(), optimizer_class=torch.optim.AdamW,
+                                        lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     return optimizer, scheduler
@@ -154,7 +155,7 @@ def main(cfg: Box) -> None:
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
                       num_nodes=cfg.num_nodes,
-                      strategy="auto",
+                      strategy="ddp",
                       loggers=[TensorBoardLogger(cfg.out_dir, name=cfg.config_name)])
     cfg.out_dir = Path(cfg.out_dir, cfg.config_name)
     cfg.out_dir.mkdir(exist_ok=True, parents=True)
