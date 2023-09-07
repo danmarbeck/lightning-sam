@@ -1,0 +1,32 @@
+batch_size: 3
+dataset:
+  type: coco
+  train:
+    annotation_file: /scratch/tmp/d_beck26/coco/annotations/instances_train2017.json
+    root_dir: /scratch/tmp/d_beck26/coco/images/train2017
+    use_embeddings: true
+  val:
+    annotation_file: /scratch/tmp/d_beck26/coco/annotations/instances_val2017.json
+    root_dir: /scratch/tmp/d_beck26/coco/images/val2017
+    use_embeddings: true
+eval_interval: 2
+model:
+  name: PrecomputedEmbeddingModel
+  checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth
+  freeze:
+    image_encoder: true
+    mask_decoder: false
+    prompt_encoder: true
+  type: vit_h
+num_devices: 1
+num_epochs: 4
+num_workers: 2
+opt:
+  decay_factor: 10
+  learning_rate: 0.00008
+  steps:
+  - 7500
+  - 9000
+  warmup_steps: 250
+  weight_decay: 0.1
+out_dir: /scratch/tmp/d_beck26/sam_training/
