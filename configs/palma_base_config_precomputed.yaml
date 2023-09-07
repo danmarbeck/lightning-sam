@@ -4,9 +4,11 @@ dataset:
   train:
     annotation_file: /scratch/tmp/d_beck26/coco/annotations/instances_train2017.json
     root_dir: /scratch/tmp/d_beck26/coco/images/train2017
+    use_embeddings: true
   val:
     annotation_file: /scratch/tmp/d_beck26/coco/annotations/instances_val2017.json
     root_dir: /scratch/tmp/d_beck26/coco/images/val2017
+    use_embeddings: true
 eval_interval: 2
 model:
   checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth

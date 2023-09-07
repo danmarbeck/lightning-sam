@@ -51,7 +51,7 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
 
     fabric.print(f"Saving checkpoint to {cfg.out_dir}")
     state_dict = model.state_dict()
-    if fabric.global_rank == 0 and cfg.save_interval % epoch == 0:
+    if fabric.global_rank == 0 and epoch % cfg.save_interval == 0:
         torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
     model.train()
 

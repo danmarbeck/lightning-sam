@@ -19,10 +19,13 @@ from typing import Tuple
 
 class COCODataset(Dataset):
 
-    def __init__(self, root_dir, annotation_file, transform=None, return_path=False):
+    def __init__(self, root_dir, annotation_file, inference=False, transform=None, return_path=False, use_embeddings=False):
         self.root_dir = root_dir
         self.transform = transform
         self.return_path = return_path
+        self.split = Path(self.root_dir).name[:-4]
+        self.use_embeddings = use_embeddings
+        self.inference = inference
         self.coco = COCO(annotation_file)
         self.image_ids = list(self.coco.imgs.keys())
 
@@ -37,6 +40,13 @@ class COCODataset(Dataset):
         image_info = self.coco.loadImgs(image_id)[0]
         image_path = os.path.join(self.root_dir, image_info['file_name'])
         image = imageio.v3.imread(image_path)
+
+        if self.use_embeddings:
+            image_embedding = pkl.load(
+                open(Path(Path(self.root_dir).parent.parent, "sam_embeddings", self.split, image_id + ".pkl"), "rb"))
+            image_embedding = torch.tensor(image_embedding)
+        else:
+            image_embedding = None
 
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
         anns = self.coco.loadAnns(ann_ids)
@@ -54,10 +64,13 @@ class COCODataset(Dataset):
 
         bboxes = np.stack(bboxes, axis=0)
         masks = np.stack(masks, axis=0)
+
+        image_return = image_embedding if self.use_embeddings and not self.inference else image
+
         if self.return_path:
-            return image, {"boxes": torch.tensor(bboxes)}, torch.tensor(masks).float(), image_path
+            return image_return, {"boxes": torch.tensor(bboxes)}, torch.tensor(masks).float(), image_path
         else:
-            return image, {"boxes": torch.tensor(bboxes)}, torch.tensor(masks).float()
+            return image_return, {"boxes": torch.tensor(bboxes)}, torch.tensor(masks).float()
 
 
 class PascalVOCDataset(Dataset):
@@ -159,18 +172,22 @@ class PascalVOCDataset(Dataset):
         masks_rle = image_info["masks"]
         masks = [pycocotools.mask.decode(rle) for rle in masks_rle]
 
-        gaze_mask_paths = image_info["gaze_paths"]
-        gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
+        if "masks" in self.prompt_types:
+            gaze_mask_paths = image_info["gaze_paths"]
+            gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
+        else:
+            gaze_masks = None
 
         if self.inference:
-            original_data = (image.copy(), points.copy(), bboxes.copy(), gaze_masks.copy())
+            original_data = (image.copy(), points.copy(), bboxes.copy(), gaze_masks.copy() if gaze_masks is not None else None)
 
         if self.transform:
             image, masks, bboxes, gaze_masks = self.transform(image, masks, np.array(bboxes), gaze_masks)
 
         masks = np.stack(masks, axis=0)
         bboxes = np.stack(bboxes, axis=0)
-        gaze_masks = np.stack(gaze_masks, axis=0)
+        if gaze_masks is not None:
+            gaze_masks = np.stack(gaze_masks, axis=0)
 
         prompt_dict = {"points": None, "boxes": None, "masks": None}
         if "points" in self.prompt_types:
