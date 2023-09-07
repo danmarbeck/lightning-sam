@@ -11,6 +11,7 @@ dataset:
     use_embeddings: true
 eval_interval: 2
 model:
+  name: PrecomputedEmbeddingModel
   checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
