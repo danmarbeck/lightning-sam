@@ -43,7 +43,7 @@ class COCODataset(Dataset):
 
         if self.use_embeddings:
             image_embedding = pkl.load(
-                open(Path(Path(self.root_dir).parent.parent, "sam_embeddings", self.split, image_id + ".pkl"), "rb"))
+                open(Path(Path(self.root_dir).parent.parent, "sam_embeddings", self.split, image_info["file_name"][:-4] + ".pkl"), "rb"))
             image_embedding = torch.tensor(image_embedding)
         else:
             image_embedding = None
