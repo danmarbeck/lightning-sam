@@ -68,9 +68,9 @@ class COCODataset(Dataset):
         image_return = image_embedding if self.use_embeddings and not self.inference else image
 
         if self.return_path:
-            return image_return, {"boxes": torch.tensor(bboxes)}, torch.tensor(masks).float(), image_path
+            return image_return, {"boxes": torch.tensor(bboxes), "points": None, "masks": None}, torch.tensor(masks).float(), image_path
         else:
-            return image_return, {"boxes": torch.tensor(bboxes)}, torch.tensor(masks).float()
+            return image_return, {"boxes": torch.tensor(bboxes), "points": None, "masks": None}, torch.tensor(masks).float()
 
 
 class PascalVOCDataset(Dataset):
