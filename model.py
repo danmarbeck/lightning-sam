@@ -9,12 +9,17 @@ from segment_anything.modeling.sam import *
 
 class Model(nn.Module):
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, inference=False):
         super().__init__()
         self.cfg = cfg
+        self.inference = inference
 
     def setup(self):
-        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
+        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint if not self.inference else None)
+        if self.inference:
+                with open(self.cfg.model.checkpoint, "rb") as f:
+                    state_dict = torch.load(f)
+                self.load_state_dict(state_dict)
         self.model.train()
         if self.cfg.model.freeze.image_encoder:
             for param in self.model.image_encoder.parameters():
@@ -71,15 +76,16 @@ class PrecomputedEmbeddingModel(nn.Module):
     """
         This model excepts precomputed image embeddings and cannot train the image embedder
     """
-    def __init__(self, cfg):
+    def __init__(self, cfg, inference=False):
         super().__init__()
         self.prompt_encoder: PromptEncoder = None
         self.mask_decoder: MaskDecoder = None
         self.full_model: Sam = None
         self.cfg = cfg
+        self.inference = inference
 
     def setup(self):
-        self.full_model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
+        self.full_model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint if not self.inference else None)
         self.prompt_encoder = self.full_model.prompt_encoder
         self.mask_decoder = self.full_model.mask_decoder
         for param in self.full_model.image_encoder.parameters():
@@ -90,6 +96,10 @@ class PrecomputedEmbeddingModel(nn.Module):
         if self.cfg.model.freeze.mask_decoder:
             for param in self.mask_decoder.parameters():
                 param.requires_grad = False
+        if self.inference:
+            with open(self.cfg.model.checkpoint, "rb") as f:
+                state_dict = torch.load(f)
+            self.load_state_dict(state_dict)
         self.prompt_encoder.train()
         self.mask_decoder.train()
 

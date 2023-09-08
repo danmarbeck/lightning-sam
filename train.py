@@ -84,7 +84,7 @@ def train_sam(
         validated = False
 
         for iter, data in enumerate(train_dataloader):
-            if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
+            if (epoch == 1 or epoch % cfg.eval_interval == 0) and not validated:
                 val_metrics = validate(fabric, model, val_dataloader, epoch)
                 fabric.log_dict(val_metrics, step=(epoch - 1) * len(train_dataloader))
                 validated = True
@@ -143,8 +143,7 @@ def configure_opt(cfg: Box, model):
         else:
             return 1 / (cfg.opt.decay_factor ** 2)
 
-    optimizer = ZeroRedundancyOptimizer(model.get_parameters(), optimizer_class=torch.optim.AdamW,
-                                        lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
+    optimizer = torch.optim.AdamW(model.get_parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     return optimizer, scheduler
@@ -154,8 +153,7 @@ def main(cfg: Box) -> None:
     Path(cfg.out_dir).mkdir(exist_ok=True, parents=True)
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
-                      num_nodes=cfg.num_nodes,
-                      strategy="ddp",
+                      strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name=cfg.config_name)])
     cfg.out_dir = Path(cfg.out_dir, cfg.config_name)
     cfg.out_dir.mkdir(exist_ok=True, parents=True)
