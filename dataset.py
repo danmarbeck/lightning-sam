@@ -225,7 +225,7 @@ class ResizeAndPad:
 
     def __call__(self, image, masks, bboxes, gaze_masks=None):
         # Resize image and masks
-        og_h, og_w, _ = image.shape
+        og_h, og_w = image.shape[:2]
         image = self.transform.apply_image(image)
         masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
         if gaze_masks is not None:
