@@ -161,7 +161,7 @@ def main(cfg: Box) -> None:
     cfg.out_dir = Path(cfg.out_dir, cfg.config_name)
     cfg.out_dir.mkdir(exist_ok=True, parents=True)
     fabric.launch()
-    fabric.seed_everything((np.random.randint(1, 420) if args.seed is not None else 1337) + fabric.global_rank)
+    fabric.seed_everything((np.random.randint(1, 420) if args.seed else 1337) + fabric.global_rank)
 
     if fabric.global_rank == 0:
         os.makedirs(cfg.out_dir, exist_ok=True)

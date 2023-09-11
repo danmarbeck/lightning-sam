@@ -12,25 +12,25 @@ dataset:
     prompt_types:
       - masks
 eval_interval: 5
-save_interval: 20
+save_interval: 30
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
     mask_decoder: false
-    prompt_encoder: true
+    prompt_encoder: false
   type: vit_h
 num_devices: 4
 num_epochs: 180
-num_workers: 6
+num_workers: 4
 num_nodes: 1
 opt:
   decay_factor: 10
   learning_rate: 0.0008
   steps:
-  - 1500
-  - 4000
+  - 750
+  - 2000
   warmup_steps: 30
   weight_decay: 0.1
 out_dir: /scratch/tmp/d_beck26/sam_training/
