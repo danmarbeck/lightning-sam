@@ -1,4 +1,4 @@
-batch_size: 8
+batch_size: 3
 dataset:
   type: coco
   train:
@@ -9,8 +9,7 @@ dataset:
     annotation_file: /scratch/tmp/d_beck26/coco/annotations/instances_val2017.json
     root_dir: /scratch/tmp/d_beck26/coco/images/val2017
     use_embeddings: true
-eval_interval: 1
-save_interval: 1
+eval_interval: 2
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth
@@ -19,9 +18,10 @@ model:
     mask_decoder: false
     prompt_encoder: true
   type: vit_h
-num_devices: 4
-num_epochs: 5
+num_devices: 1
+num_epochs: 4
 num_workers: 2
+num_nodes: 2
 opt:
   decay_factor: 10
   learning_rate: 0.00008
