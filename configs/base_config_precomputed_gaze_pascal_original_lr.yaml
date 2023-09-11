@@ -4,9 +4,13 @@ dataset:
   train:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
     use_embeddings: true
+    prompt_types:
+      - masks
   val:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
     use_embeddings: true
+    prompt_types:
+      - masks
 eval_interval: 5
 save_interval: 60
 model:
@@ -15,11 +19,11 @@ model:
   freeze:
     image_encoder: true
     mask_decoder: false
-    prompt_encoder: true
+    prompt_encoder: false
   type: vit_h
 num_devices: 2
-num_epochs: 120
-num_workers: 4
+num_epochs: 180
+num_workers: 0
 opt:
   decay_factor: 10
   learning_rate: 0.00008
