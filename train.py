@@ -4,10 +4,13 @@ import time
 from pathlib import Path
 
 import lightning as L
+import numpy as np
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn.functional as F
 from box import Box
+from lightning.fabric.strategies import DDPStrategy
+
 from config import cfg
 from dataset import load_datasets
 from lightning.fabric.fabric import _FabricOptimizer
@@ -16,7 +19,7 @@ from losses import DiceLoss
 from losses import FocalLoss
 from model import MODELS, Model
 from torch.utils.data import DataLoader
-from torch.distributed.optim import ZeroRedundancyOptimizer
+from torch.nn.parallel import DistributedDataParallel
 from utils import AverageMeter
 from utils import calc_iou
 
@@ -53,7 +56,7 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
     fabric.print(f"Saving checkpoint to {cfg.out_dir}")
     state_dict = model.state_dict()
     if fabric.global_rank == 0 and epoch % cfg.save_interval == 0:
-        torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
+        torch.save(state_dict, os.path.join(cfg.out_dir, f"{Path(fabric.logger.log_dir).name}_epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
     model.train()
 
     return {"iou_val": ious.avg, "f1_avg": f1_scores.avg}
@@ -153,12 +156,12 @@ def main(cfg: Box) -> None:
     Path(cfg.out_dir).mkdir(exist_ok=True, parents=True)
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
-                      strategy="auto",
+                      strategy=DDPStrategy(start_method="popen", find_unused_parameters=True),
                       loggers=[TensorBoardLogger(cfg.out_dir, name=cfg.config_name)])
     cfg.out_dir = Path(cfg.out_dir, cfg.config_name)
     cfg.out_dir.mkdir(exist_ok=True, parents=True)
     fabric.launch()
-    fabric.seed_everything(1337 + fabric.global_rank)
+    fabric.seed_everything((np.random.randint(1, 420) if args.seed is not None else 1337) + fabric.global_rank)
 
     if fabric.global_rank == 0:
         os.makedirs(cfg.out_dir, exist_ok=True)
@@ -182,6 +185,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Finetune SAM using the corresponding training config")
     parser.add_argument("--config", default="configs/base_config.yaml", type=str,
                         help="Path to .yaml file containing the config.")
+    parser.add_argument("--seed", action="store_true", help="if set, use random seed for init")
 
     args = parser.parse_args()
     if args.config is not None:

@@ -96,8 +96,8 @@ class PascalVOCDataset(Dataset):
 
     def _get_image_dict(self):
 
-        if Path(self.root_dir, "sam_dataset_info_dict.yaml").exists():
-            return yaml.load(open(Path(self.root_dir, "sam_dataset_info_dict.yaml"), "r"), yaml.FullLoader)
+        if Path(self.root_dir, "sam_dataset_info_dict.pkl").exists():
+            return pkl.load(open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "rb"))
         else:
             return self._construct_image_dict()
 
@@ -118,6 +118,7 @@ class PascalVOCDataset(Dataset):
             for image_path in image_paths:
 
                 gaze_path = Path(image_path.parent.parent, "gaze_images", image_path.name).absolute()
+                fixation_path = Path(image_path.parent.parent, "fixation_images", image_path.name).absolute()
 
                 fileid = "_".join(image_path.stem.split("_")[:2])
 
@@ -129,6 +130,7 @@ class PascalVOCDataset(Dataset):
                         "bboxes": [],
                         "masks": [],
                         "gaze_paths": [],
+                        "fixations": [],
                     }
                     image_dict[fileid] = r
 
@@ -143,11 +145,20 @@ class PascalVOCDataset(Dataset):
                 segmentation_rle_dict = pycocotools.mask.encode(np.asarray(mask_array, order="F"))
                 assert type(segmentation_rle_dict) == dict, type(segmentation_rle_dict)
 
+                fixation_img = imageio.v3.imread(fixation_path)
+                if len(fixation_img.shape) == 3:
+                    fixation_img = np.sum(fixation_img, axis=2, dtype=int)
+                fixation_img = fixation_img.astype(bool)
+                fixation_points = np.transpose(np.nonzero(fixation_img))
+                fixation_points = fixation_points[:, ::-1]
+
                 image_dict[fileid]["gaze_paths"].append(str(gaze_path))
                 image_dict[fileid]["bboxes"].append(bbox)
                 image_dict[fileid]["masks"].append(segmentation_rle_dict)
+                image_dict[fileid]["fixations"].append(fixation_points.tolist())
 
         yaml.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.yaml"), "w"))
+        pkl.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "wb"))
         return image_dict
 
     def __len__(self):
@@ -167,7 +178,7 @@ class PascalVOCDataset(Dataset):
         else:
             image_embedding = None
 
-        points = [] # TODO
+        points = image_info["fixations"]
         bboxes = image_info["bboxes"]
         masks_rle = image_info["masks"]
         masks = [pycocotools.mask.decode(rle) for rle in masks_rle]
@@ -182,16 +193,17 @@ class PascalVOCDataset(Dataset):
             original_data = (image.copy(), points.copy(), bboxes.copy(), gaze_masks.copy() if gaze_masks is not None else None)
 
         if self.transform:
-            image, masks, bboxes, gaze_masks = self.transform(image, masks, np.array(bboxes), gaze_masks)
+            image, masks, bboxes, gaze_masks, points = self.transform(image, masks, np.array(bboxes), points, gaze_masks)
 
         masks = np.stack(masks, axis=0)
         bboxes = np.stack(bboxes, axis=0)
+        points = [torch.tensor(points_one_mask) for points_one_mask in points]
         if gaze_masks is not None:
             gaze_masks = np.stack(gaze_masks, axis=0)
 
         prompt_dict = {"points": None, "boxes": None, "masks": None}
         if "points" in self.prompt_types:
-            raise NotImplementedError
+            prompt_dict["points"] = points
         if "boxes" in self.prompt_types:
             prompt_dict["boxes"] = torch.tensor(bboxes)
         if "masks" in self.prompt_types:
@@ -223,7 +235,7 @@ class ResizeAndPad:
         self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
         self.to_tensor = transforms.ToTensor()
 
-    def __call__(self, image, masks, bboxes, gaze_masks=None):
+    def __call__(self, image, masks, bboxes, points=None, gaze_masks=None):
         # Resize image and masks
         og_h, og_w = image.shape[:2]
         image = self.transform.apply_image(image)
@@ -252,10 +264,18 @@ class ResizeAndPad:
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
         bboxes = [[bbox[0] + pad_w, bbox[1] + pad_h, bbox[2] + pad_w, bbox[3] + pad_h] for bbox in bboxes]
 
-        if gaze_masks is not None:
-            return image, masks, bboxes, gaze_masks
-        else:
-            return image, masks, bboxes
+        # Adjust points
+        if points is not None:
+            pass # TODO
+            # points = [self.transform.apply_coords(np.array(points_one_mask), (og_h, og_w)) for points_one_mask in points]
+            # points = [[[point[0] + pad_w, point[1] + pad_h] for point in points_one_mask] for points_one_mask in points]
+
+        return_list = [masks, bboxes]
+        if gaze_masks is not None or points is not None:
+            return_list.append(gaze_masks)
+            return_list.append(points)
+
+        return image, *return_list
 
 
 DATASETS = {"coco": COCODataset,

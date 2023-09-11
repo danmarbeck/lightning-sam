@@ -27,6 +27,8 @@ def show_mask(mask, ax, random_color=False):
         color = np.array([30 / 255, 144 / 255, 255 / 255, 0.6])
     h, w = mask.shape[-2:]
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+    if mask_image.max() > 1:
+        mask_image = mask_image.astype(int)
     ax.imshow(mask_image)
 
 
@@ -53,7 +55,7 @@ def main(cfg: Box) -> None:
         out_path = Path(Path(cfg.out_dir), cfg.config_name, "predictions")
     out_path.mkdir(parents=True, exist_ok=True)
 
-    model = MODELS[cfg.model.name](cfg)
+    model = MODELS[cfg.model.name](cfg, inference=True)
     model.setup()
     model = model.to(device=torch.device("cuda:0"))
     predictor = SamPredictor(model)
@@ -66,6 +68,9 @@ def main(cfg: Box) -> None:
     val_arg_dict["return_path"] = True
     val = dataset_cls(**val_arg_dict)
 
+    ious = AverageMeter()
+    f1_scores = AverageMeter()
+
     model.eval()
 
     with torch.no_grad():
@@ -73,6 +78,7 @@ def main(cfg: Box) -> None:
         for iter, data in tqdm(enumerate(val), total=len(val)):
             image, prompt_input, gt_masks, image_path, (H, W), (og_image, og_points, og_bboxes, og_mask_input) = data
             image = image.to(device=device)[None, ...]
+            gt_masks = gt_masks.to(device=device)
 
             predictor.set_torch_image(image, (H, W))
 
@@ -97,8 +103,27 @@ def main(cfg: Box) -> None:
             )
             # masks shape Bx1xHxW
 
-            fig, ax = plt.subplots(figsize=(8, 4.5))
+            val_masks = F.interpolate(
+                low_res_masks,
+                (model.get_img_size(), model.get_img_size()),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)
 
+            batch_stats = smp.metrics.get_stats(
+                val_masks,
+                gt_masks.int(),
+                mode='binary',
+                threshold=0.5,
+            )
+            batch_iou = smp.metrics.iou_score(*batch_stats, reduction="micro-imagewise")
+            batch_f1 = smp.metrics.f1_score(*batch_stats, reduction="micro-imagewise")
+            ious.update(batch_iou)
+            f1_scores.update(batch_f1)
+
+            print(f'Val: Mean IoU: [{ious.avg:.4f}] -- Mean F1: [{f1_scores.avg:.4f}]')
+
+            fig, ax = plt.subplots(figsize=(8, 4.5))
             ax.imshow(og_image)
 
             for pred_idx in range(len(masks)):
@@ -111,6 +136,7 @@ def main(cfg: Box) -> None:
                     show_box(og_bboxes[pred_idx], ax=ax)
 
             fig.savefig(Path(out_path, Path(image_path).stem + ".png"))
+            plt.close()
 
 
 if __name__ == "__main__":
