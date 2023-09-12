@@ -131,11 +131,12 @@ def train_sam(
                              "iou_loss": iou_losses.val,
                              "total_loss": total_losses.val,
                              "batch_time": batch_time.val,
-                             "data_time": data_time.val
+                             "data_time": data_time.val,
                              }, step=(epoch - 1) * len(train_dataloader) + iter)
+        fabric.log_dict({"lr": scheduler.get_last_lr()[0]}, step=epoch * len(train_dataloader))
 
 
-def configure_opt(cfg: Box, model):
+def configure_opt(cfg: Box, model, num_steps_per_epoch):
     def lr_lambda(step):
         if step < cfg.opt.warmup_steps:
             return step / cfg.opt.warmup_steps
@@ -146,8 +147,14 @@ def configure_opt(cfg: Box, model):
         else:
             return 1 / (cfg.opt.decay_factor ** 2)
 
+    def lr_lambda_exp(step):
+        if step < cfg.opt.warmup_steps:
+            return step / cfg.opt.warmup_steps
+        else:
+            return 0.95 ** (step // num_steps_per_epoch)
+
     optimizer = torch.optim.AdamW(model.get_parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda_exp)
 
     return optimizer, scheduler
 
@@ -174,7 +181,7 @@ def main(cfg: Box) -> None:
     train_data = fabric._setup_dataloader(train_data)
     val_data = fabric._setup_dataloader(val_data)
 
-    optimizer, scheduler = configure_opt(cfg, model)
+    optimizer, scheduler = configure_opt(cfg, model, num_steps_per_epoch=len(train_data))
     model, optimizer = fabric.setup(model, optimizer)
 
     train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)

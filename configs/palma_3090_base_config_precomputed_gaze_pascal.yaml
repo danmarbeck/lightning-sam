@@ -4,9 +4,13 @@ dataset:
   train:
     root_dir: /scratch/tmp/d_beck26/PascalVOC2012/VOC2012/focused_gaze/train
     use_embeddings: true
+    prompt_types:
+      - masks
   val:
     root_dir: /scratch/tmp/d_beck26/PascalVOC2012/VOC2012/focused_gaze/val
     use_embeddings: true
+    prompt_types:
+      - masks
 eval_interval: 5
 save_interval: 30
 model:
@@ -15,18 +19,18 @@ model:
   freeze:
     image_encoder: true
     mask_decoder: false
-    prompt_encoder: true
+    prompt_encoder: false
   type: vit_h
 num_devices: 4
-num_epochs: 180
+num_epochs: 75
 num_workers: 4
 num_nodes: 1
 opt:
   decay_factor: 10
-  learning_rate: 0.00008
+  learning_rate: 0.0008
   steps:
-  - 1000
-  - 1500
+  - 750
+  - 2000
   warmup_steps: 30
   weight_decay: 0.1
 out_dir: /scratch/tmp/d_beck26/sam_training/

@@ -22,7 +22,7 @@ model:
     prompt_encoder: false
   type: vit_h
 num_devices: 2
-num_epochs: 180
+num_epochs: 75
 num_workers: 0
 opt:
   decay_factor: 10
