@@ -1,4 +1,4 @@
-batch_size: 16
+batch_size: 12
 dataset:
   type: pascal
   train:
@@ -12,7 +12,7 @@ dataset:
     prompt_types:
       - fixations
 eval_interval: 5
-save_interval: 30
+save_interval: 25
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth
@@ -22,7 +22,7 @@ model:
     prompt_encoder: false
   type: vit_h
 num_devices: 4
-num_epochs: 180
+num_epochs: 75
 num_workers: 4
 num_nodes: 1
 opt:
