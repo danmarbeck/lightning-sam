@@ -2,6 +2,7 @@ import os
 import re
 from pathlib import Path
 
+import PIL.Image
 import imageio
 import numpy as np
 import pickle as pkl
