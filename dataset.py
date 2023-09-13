@@ -99,6 +99,7 @@ class PascalVOCDataset(Dataset):
         self.image_dict = self._get_image_dict()
 
         self.image_ids = list(self.image_dict.keys())
+        self.image_ids.remove("__version")
 
     def _get_image_dict(self):
 
