@@ -60,7 +60,7 @@ class COCODataset(Dataset):
             masks.append(mask)
 
         if self.transform:
-            image, masks, bboxes = self.transform(image, masks, np.array(bboxes))
+            image, masks, bboxes, padding = self.transform(image, masks, np.array(bboxes))
 
         bboxes = np.stack(bboxes, axis=0)
         masks = np.stack(masks, axis=0)
@@ -78,10 +78,13 @@ class PascalVOCDataset(Dataset):
         PascalVOCDataset for image-based gaze version of the dataset, including the option of precomputed embeddings
         @param root_dir: Path to folder containing the gaze images, masks and original etc. as folders, per class
         @param prompt_types: Tuple containing the used prompt types. Choose out of: points, boxes, masks
+        @param mask_type: Type of heatmap construction used for gaze mask. Default is 'gaussian', which applies a
+            gaussian blur to the gaze mask image. Choose out of: gaussian, fixation, fixation_duration, gaze
     """
 
     def __init__(self, root_dir, inference=False, transform=None, return_path=False, use_embeddings=False,
-                 prompt_types: Tuple = ("boxes",)):
+                 prompt_types: Tuple = ("boxes",), mask_type="gaussian"):
+        self.VERSION = 1
         self.root_dir = root_dir
         self.transform = transform
         self.return_path = return_path
@@ -89,7 +92,9 @@ class PascalVOCDataset(Dataset):
         self.use_embeddings = use_embeddings
         self.inference = inference
         assert all(prompt_type in ["boxes", "points", "masks", "fixations"] for prompt_type in prompt_types), "Invalid prompt type"
+        assert mask_type in ["gaussian", "fixation", "fixation_duration", "gaze"], "Invalid mask type"
         self.prompt_types = prompt_types
+        self.mask_type = mask_type
         self.image_dict = self._get_image_dict()
 
         self.image_ids = list(self.image_dict.keys())
@@ -97,7 +102,11 @@ class PascalVOCDataset(Dataset):
     def _get_image_dict(self):
 
         if Path(self.root_dir, "sam_dataset_info_dict.pkl").exists():
-            return pkl.load(open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "rb"))
+            data_dict = pkl.load(open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "rb"))
+            if self.VERSION > data_dict.get("__version", -1):
+                print("Version mismatch detected.")
+                return self._construct_image_dict()
+            return data_dict
         else:
             return self._construct_image_dict()
 
@@ -118,6 +127,9 @@ class PascalVOCDataset(Dataset):
             for image_path in image_paths:
 
                 gaze_path = Path(image_path.parent.parent, "gaze_images", image_path.name).absolute()
+                hm_fixations_path = Path(image_path.parent.parent, "heatmaps_based_on_fixations_mask", image_path.name + ".npy").absolute()
+                hm_fixations_duration_path = Path(image_path.parent.parent, "heatmaps_based_on_fixations_mask_using_duration", image_path.name + ".npy").absolute()
+                hm_gaze_path = Path(image_path.parent.parent, "heatmaps_based_on_gaze_data_mask", image_path.name + ".npy").absolute()
                 fixation_path = Path(image_path.parent.parent, "fixation_images", image_path.name).absolute()
 
                 fileid = "_".join(image_path.stem.split("_")[:2])
@@ -130,6 +142,9 @@ class PascalVOCDataset(Dataset):
                         "bboxes": [],
                         "masks": [],
                         "gaze_paths": [],
+                        "heatmap_paths": {"fixation": [],
+                                          "fixation_duration": [],
+                                          "gaze": []},
                         "fixations": [],
                     }
                     image_dict[fileid] = r
@@ -153,10 +168,14 @@ class PascalVOCDataset(Dataset):
                 fixation_points = fixation_points[:, ::-1]
 
                 image_dict[fileid]["gaze_paths"].append(str(gaze_path))
+                image_dict[fileid]["heatmap_paths"]["fixation"].append(str(hm_fixations_path))
+                image_dict[fileid]["heatmap_paths"]["fixation_duration"].append(str(hm_fixations_duration_path))
+                image_dict[fileid]["heatmap_paths"]["gaze"].append(str(hm_gaze_path))
                 image_dict[fileid]["bboxes"].append(bbox)
                 image_dict[fileid]["masks"].append(segmentation_rle_dict)
                 image_dict[fileid]["fixations"].append(fixation_points.tolist())
 
+        image_dict["__version"] = self.VERSION
         yaml.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.yaml"), "w"))
         pkl.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "wb"))
         return image_dict
@@ -191,16 +210,26 @@ class PascalVOCDataset(Dataset):
             points = fixations
 
         if "masks" in self.prompt_types:
-            gaze_mask_paths = image_info["gaze_paths"]
-            gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
+            if self.mask_type == "gaussian":
+                gaze_mask_paths = image_info["gaze_paths"]
+                gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
+                self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
+                gaze_masks = [np.array(self.gaze_transform(PIL.Image.fromarray(gaze_mask))) for gaze_mask in gaze_masks]
+            else:
+                gaze_mask_paths = image_info["heatmap_paths"][self.mask_type]
+                gaze_masks = [np.load(gaze_mask_path) for gaze_mask_path in gaze_mask_paths]
+                points
         else:
             gaze_masks = None
 
         if self.inference:
-            original_data = (image.copy(), points.copy(), bboxes.copy(), gaze_masks.copy() if gaze_masks is not None else None)
+            original_data = (image.copy(), points.copy(), bboxes.copy(),
+                             gaze_masks.copy() if gaze_masks is not None else None,)
 
         if self.transform:
-            image, masks, bboxes, gaze_masks, points = self.transform(image, masks, np.array(bboxes), points, gaze_masks)
+            image, masks, bboxes, gaze_masks, points, padding = self.transform(image, masks, np.array(bboxes), points, gaze_masks)
+            if self.inference:
+                original_data = (*original_data, padding)
 
         masks = np.stack(masks, axis=0)
         bboxes = np.stack(bboxes, axis=0)
@@ -226,7 +255,7 @@ class PascalVOCDataset(Dataset):
             return_list.append((og_h, og_w))
             return_list.append(original_data)
 
-        image_return = image_embedding if self.use_embeddings and not self.inference else image
+        image_return = image_embedding if self.use_embeddings else image
 
         return image_return, *return_list
 
@@ -350,6 +379,8 @@ class CellPose500Dataset(Dataset):
         if "masks" in self.prompt_types:
             gaze_mask_paths = image_info["gaze_paths"]
             gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
+            self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
+            gaze_masks = [self.gaze_transform(gaze_mask) for gaze_mask in gaze_masks]
         else:
             gaze_masks = None
 
@@ -357,7 +388,7 @@ class CellPose500Dataset(Dataset):
             original_data = (image.copy(), points.copy(), bboxes.copy(), gaze_masks.copy() if gaze_masks is not None else None)
 
         if self.transform:
-            image, masks, bboxes, gaze_masks, points = self.transform(image, masks, np.array(bboxes), points, gaze_masks)
+            image, masks, bboxes, gaze_masks, points, padding = self.transform(image, masks, np.array(bboxes), points, gaze_masks)
 
         masks = np.stack(masks, axis=0)
         bboxes = np.stack(bboxes, axis=0)
@@ -396,11 +427,11 @@ def collate_fn(batch):
 
 class ResizeAndPad:
 
-    def __init__(self, target_size):
+    def __init__(self, target_size, inference=False):
         self.target_size = target_size
         self.transform = ResizeLongestSide(target_size)
-        self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
         self.to_tensor = transforms.ToTensor()
+        self.inference = inference
 
     def __call__(self, image, masks, bboxes, points=None, gaze_masks=None):
         # Resize image and masks
@@ -410,7 +441,6 @@ class ResizeAndPad:
         if gaze_masks is not None:
             gaze_masks = [torch.tensor(self.transform.apply_image(gaze_mask)).bool().float() for gaze_mask in
                           gaze_masks]
-            gaze_masks = [self.gaze_transform(gaze_mask[None, ...]) for gaze_mask in gaze_masks]
         image = self.to_tensor(image)
 
         # Pad image and masks to form a square
@@ -442,6 +472,8 @@ class ResizeAndPad:
         if gaze_masks is not None or points is not None:
             return_list.append(gaze_masks)
             return_list.append(points)
+
+        return_list.append(padding)
 
         return image, *return_list
 
