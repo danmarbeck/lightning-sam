@@ -37,6 +37,7 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
             num_images = images.size(0)
             pred_masks, _ = model(images, prompt_input)
             for pred_mask, gt_mask in zip(pred_masks, gt_masks):
+                pred_mask = pred_mask.sigmoid()
                 batch_stats = smp.metrics.get_stats(
                     pred_mask,
                     gt_mask.int(),
