@@ -217,10 +217,11 @@ class PascalVOCDataset(Dataset):
                 gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
                 self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
                 gaze_masks = [np.array(self.gaze_transform(PIL.Image.fromarray(gaze_mask))) for gaze_mask in gaze_masks]
+                gaze_masks = [gaze_mask / np.max(gaze_mask) for gaze_mask in gaze_masks]
             else:
                 gaze_mask_paths = image_info["heatmap_paths"][self.mask_type]
                 gaze_masks = [np.load(gaze_mask_path) for gaze_mask_path in gaze_mask_paths]
-                points
+                gaze_masks = [mask / np.max(mask) for mask in gaze_masks]
         else:
             gaze_masks = None
 
@@ -441,8 +442,9 @@ class ResizeAndPad:
         image = self.transform.apply_image(image)
         masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
         if gaze_masks is not None:
-            gaze_masks = [torch.tensor(self.transform.apply_image(gaze_mask)).bool().float() for gaze_mask in
-                          gaze_masks]
+            gaze_masks = torch.tensor(gaze_masks, dtype=torch.float32).unsqueeze(1)
+            gaze_masks = self.transform.apply_image_torch(gaze_masks) # bchw format
+
         image = self.to_tensor(image)
 
         # Pad image and masks to form a square
@@ -455,9 +457,9 @@ class ResizeAndPad:
         image = transforms.Pad(padding)(image)
         masks = [transforms.Pad(padding)(mask) for mask in masks]
         if gaze_masks is not None:
-            gaze_masks = [transforms.Pad(padding)(gaze_mask) for gaze_mask in gaze_masks]
-            gaze_masks = [transforms.Resize(self.target_size // 4, antialias=True)(gaze_mask) for gaze_mask in
-                          gaze_masks]
+            gaze_masks = transforms.Pad(padding)(gaze_masks)
+            gaze_masks = transforms.Resize(self.target_size // 4, antialias=True)(gaze_masks)
+            gaze_masks = [gaze_mask for gaze_mask in gaze_masks.squeeze(1)]
 
         # Adjust bounding boxes
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
