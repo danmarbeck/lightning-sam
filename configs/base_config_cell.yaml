@@ -1,29 +1,25 @@
-batch_size: 24
+batch_size: 3
 dataset:
   type: cell
   train:
     root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
-    use_embeddings: true
-    prompt_types:
-      - masks
+    use_embeddings: false
   val:
     root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
-    use_embeddings: true
-    prompt_types:
-      - masks
+    use_embeddings: false
 eval_interval: 5
-save_interval: 60
+save_interval: 20
 model:
-  name: PrecomputedEmbeddingModel
+  name: Model
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
     mask_decoder: false
-    prompt_encoder: false
+    prompt_encoder: true
   type: vit_h
 num_devices: 2
-num_epochs: 180
-num_workers: 0
+num_epochs: 75
+num_workers: 4
 opt:
   decay_factor: 10
   learning_rate: 0.0008

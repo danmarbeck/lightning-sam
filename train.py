@@ -186,7 +186,8 @@ def main(cfg: Box) -> None:
     model, optimizer = fabric.setup(model, optimizer)
 
     train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    validate(fabric, model, val_data, epoch=cfg.num_epochs)
+    val_metrics = validate(fabric, model, val_data, epoch=cfg.num_epochs)
+    fabric.log_dict(val_metrics, step=(cfg.num_epochs - 1) * len(train_data))
 
 
 if __name__ == "__main__":

@@ -5,12 +5,12 @@ dataset:
     root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
     use_embeddings: true
     prompt_types:
-      - masks
+      - points
   val:
     root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
     use_embeddings: true
     prompt_types:
-      - masks
+      - points
 eval_interval: 5
 save_interval: 60
 model:

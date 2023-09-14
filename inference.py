@@ -74,7 +74,7 @@ def main(cfg: Box) -> None:
 
     with torch.no_grad():
 
-        for iter, data in tqdm(enumerate(val), total=len(val)):
+        for iter, data in (pbar := tqdm(enumerate(val), total=len(val))):
             image, prompt_input, gt_masks, image_path, (H, W), (og_image, og_points, og_bboxes, og_mask_input, padding) = data
             image = image.to(device=device)[None, ...]
             gt_masks = gt_masks.to(device=device)
@@ -126,7 +126,7 @@ def main(cfg: Box) -> None:
 
             masks = masks > 0.5
 
-            print(f'Val: Mean IoU: [{ious.avg:.4f}] -- Mean F1: [{f1_scores.avg:.4f}]')
+            pbar.set_description(f'Val: Mean IoU: [{ious.avg:.4f}] -- Mean F1: [{f1_scores.avg:.4f}]', refresh=True)
 
             fig, ax = plt.subplots(figsize=(8, 4.5))
             ax.imshow(og_image)

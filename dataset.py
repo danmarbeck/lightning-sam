@@ -112,6 +112,19 @@ class PascalVOCDataset(Dataset):
         else:
             return self._construct_image_dict()
 
+    def _get_bbox_regex(self):
+        return re.compile("\d{4}_\d{6}_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
+
+    def _get_image_path(self, image_path):
+        fileid = "_".join(image_path.stem.split("_")[:2])
+        return Path(Path(self.root_dir).parent.parent, "JPEGImages", fileid + ".jpg").absolute().__str__()
+
+    def _get_image_embedding(self, image_path, image_id):
+        image_embedding = pkl.load(
+            open(Path(Path(self.root_dir).parent.parent, "sam_embeddings", self.split, image_id + ".pkl"), "rb"))
+        image_embedding = torch.tensor(image_embedding)
+        return image_embedding
+
     def _construct_image_dict(self):
         """
             Constructs a dict, keys are image ids, dict contains list of bboxes and paths to additional info, and saves it to disk
@@ -119,7 +132,7 @@ class PascalVOCDataset(Dataset):
         image_dict = {}
         print("Constructing image dict...")
 
-        bbox_regex = re.compile("\d{4}_\d{6}_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
+        bbox_regex = self._get_bbox_regex()
 
         for class_dir in Path(self.root_dir).iterdir():
             if not class_dir.is_dir():
@@ -138,8 +151,7 @@ class PascalVOCDataset(Dataset):
 
                 if fileid not in image_dict.keys():
                     r = {
-                        "original": Path(Path(self.root_dir).parent.parent, "JPEGImages",
-                                         fileid + ".jpg").absolute().__str__(),
+                        "original": self._get_image_path(image_path),
                         "image_id": fileid,
                         "bboxes": [],
                         "masks": [],
@@ -193,9 +205,7 @@ class PascalVOCDataset(Dataset):
         og_h, og_w, _ = image.shape
 
         if self.use_embeddings:
-            image_embedding = pkl.load(
-                open(Path(Path(self.root_dir).parent.parent, "sam_embeddings", self.split, image_id + ".pkl"), "rb"))
-            image_embedding = torch.tensor(image_embedding)
+            image_embedding = self._get_image_embedding(image_path, image_id)
         else:
             image_embedding = None
 
@@ -263,7 +273,7 @@ class PascalVOCDataset(Dataset):
         return image_return, *return_list
 
 
-class CellPose500Dataset(Dataset):
+class CellPose500Dataset(PascalVOCDataset):
     """
         CellPose500Dataset for image-based gaze version of the dataset, including the option of precomputed embeddings
         @param root_dir: Path to folder containing the gaze images, masks and original etc. as folders, per class
@@ -271,156 +281,21 @@ class CellPose500Dataset(Dataset):
     """
 
     def __init__(self, root_dir, inference=False, transform=None, return_path=False, use_embeddings=False,
-                 prompt_types: Tuple = ("boxes",)):
-        self.root_dir = root_dir
-        self.transform = transform
-        self.return_path = return_path
-        self.split = Path(self.root_dir).name
-        self.use_embeddings = use_embeddings
-        self.inference = inference
-        assert all(prompt_type in ["boxes", "points", "masks", "fixations"] for prompt_type in prompt_types), "Invalid prompt type"
-        self.prompt_types = prompt_types
-        self.image_dict = self._get_image_dict()
+                 prompt_types: Tuple = ("boxes",), mask_type="gaussian"):
+        super().__init__(root_dir, inference, transform, return_path, use_embeddings, prompt_types, mask_type)
+        self.split = "train"
 
-        self.image_ids = list(self.image_dict.keys())
+    def _get_bbox_regex(self):
+        return re.compile("\d{3}_img.png_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
 
-    def _get_image_dict(self):
+    def _get_image_path(self, image_path):
+        return image_path
 
-        if Path(self.root_dir, "sam_dataset_info_dict.pkl").exists():
-            return pkl.load(open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "rb"))
-        else:
-            return self._construct_image_dict()
-
-    def _construct_image_dict(self):
-        """
-            Constructs a dict, keys are image ids, dict contains list of bboxes and paths to additional info, and saves it to disk
-        """
-        image_dict = {}
-        print("Constructing image dict...")
-
-        bbox_regex = re.compile("\d{3}_img.png_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
-
-        for class_dir in Path(self.root_dir).iterdir():
-            if not class_dir.is_dir():
-                continue
-            image_paths = list(Path(class_dir, "original").glob("*.png"))
-
-            for image_path in image_paths:
-
-                gaze_path = Path(image_path.parent.parent, "gaze_images", image_path.name).absolute()
-                fixation_path = Path(image_path.parent.parent, "fixation_images", image_path.name).absolute()
-
-                fileid = "_".join(image_path.stem.split("_")[:2])
-
-                if fileid not in image_dict.keys():
-                    r = {
-                        "original": image_path,
-                        "image_id": fileid,
-                        "bboxes": [],
-                        "masks": [],
-                        "gaze_paths": [],
-                        "fixations": [],
-                    }
-                    image_dict[fileid] = r
-
-                bbox_wrong_order = list(map(float, bbox_regex.match(str(image_path.stem)).groups()))
-                bbox = [bbox_wrong_order[2], bbox_wrong_order[0], bbox_wrong_order[3],
-                        bbox_wrong_order[1]]  # x_min, y_min, x_max, y_max
-
-                mask_array = imageio.v3.imread(Path(image_path.parent.parent, "masks", image_path.name))
-                if len(mask_array.shape) == 3:
-                    mask_array = np.sum(mask_array, axis=2, dtype=int)
-                mask_array = mask_array.astype(bool).astype(np.uint8)
-                segmentation_rle_dict = pycocotools.mask.encode(np.asarray(mask_array, order="F"))
-                assert type(segmentation_rle_dict) == dict, type(segmentation_rle_dict)
-
-                fixation_img = imageio.v3.imread(fixation_path)
-                if len(fixation_img.shape) == 3:
-                    fixation_img = np.sum(fixation_img, axis=2, dtype=int)
-                fixation_img = fixation_img.astype(bool)
-                fixation_points = np.transpose(np.nonzero(fixation_img))
-                fixation_points = fixation_points[:, ::-1]
-
-                image_dict[fileid]["gaze_paths"].append(str(gaze_path))
-                image_dict[fileid]["bboxes"].append(bbox)
-                image_dict[fileid]["masks"].append(segmentation_rle_dict)
-                image_dict[fileid]["fixations"].append(fixation_points.tolist())
-
-        yaml.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.yaml"), "w"))
-        pkl.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.pkl"), "wb"))
-        return image_dict
-
-    def __len__(self):
-        return len(self.image_ids)
-
-    def __getitem__(self, idx):
-        image_id = self.image_ids[idx]
-        image_info = self.image_dict[image_id]
-        image_path = image_info["original"]
-        image = imageio.v3.imread(image_path)
-        og_h, og_w, _ = image.shape
-
-        if self.use_embeddings:
-            image_embedding = pkl.load(
-                open(Path(Path(self.root_dir).parent.parent, "sam_embeddings", self.split, image_id + ".pkl"), "rb"))
-            image_embedding = torch.tensor(image_embedding)
-        else:
-            image_embedding = None
-
-        fixations = image_info["fixations"]
-        bboxes = image_info["bboxes"]
-        masks_rle = image_info["masks"]
-        masks = [pycocotools.mask.decode(rle) for rle in masks_rle]
-
-        if "points" in self.prompt_types:
-            all_points = [np.transpose(np.nonzero(mask)) for mask in masks]
-            all_points = [points[np.random.choice(a=len(points), size=min(8, len(points)), replace=False), ::-1] for points in all_points]
-            points = all_points
-        else:
-            points = fixations
-
-        if "masks" in self.prompt_types:
-            gaze_mask_paths = image_info["gaze_paths"]
-            gaze_masks = [imageio.v3.imread(gaze_path) for gaze_path in gaze_mask_paths]
-            self.gaze_transform = transforms.GaussianBlur(kernel_size=7, sigma=5)
-            gaze_masks = [self.gaze_transform(gaze_mask) for gaze_mask in gaze_masks]
-        else:
-            gaze_masks = None
-
-        if self.inference:
-            original_data = (image.copy(), points.copy(), bboxes.copy(), gaze_masks.copy() if gaze_masks is not None else None)
-
-        if self.transform:
-            image, masks, bboxes, gaze_masks, points, padding = self.transform(image, masks, np.array(bboxes), points, gaze_masks)
-
-        masks = np.stack(masks, axis=0)
-        bboxes = np.stack(bboxes, axis=0)
-        points, labels = points
-        points = torch.nn.utils.rnn.pad_sequence([torch.tensor(points_one_mask) for points_one_mask in points], batch_first=True, padding_value=0)
-        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
-        points = (points, labels)
-        if gaze_masks is not None:
-            gaze_masks = np.stack(gaze_masks, axis=0)
-
-        prompt_dict = {"points": None, "boxes": None, "masks": None}
-        if "points" in self.prompt_types or "fixations" in self.prompt_types:
-            prompt_dict["points"] = points
-        if "boxes" in self.prompt_types:
-            prompt_dict["boxes"] = torch.tensor(bboxes)
-        if "masks" in self.prompt_types:
-            prompt_dict["masks"] = torch.tensor(gaze_masks).float()
-
-        return_list = [prompt_dict, torch.tensor(masks).float()]
-        if self.return_path:
-            return_list.append(image_path)
-        if self.inference:
-            return_list.append((og_h, og_w))
-            return_list.append(original_data)
-
-        image_return = image_embedding if self.use_embeddings and not self.inference else image
-
-        return image_return, *return_list
-
+    def _get_image_embedding(self, image_path, image_id):
+        image_embedding = pkl.load(
+            open(Path(Path(self.root_dir), "sam_embeddings", self.split, image_path.stem + ".pkl"), "rb"))
+        image_embedding = torch.tensor(image_embedding)
+        return image_embedding
 
 def collate_fn(batch):
     images, prompts, *rest = tuple(zip(*batch))
