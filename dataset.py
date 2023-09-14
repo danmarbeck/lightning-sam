@@ -442,7 +442,7 @@ class ResizeAndPad:
         image = self.transform.apply_image(image)
         masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
         if gaze_masks is not None:
-            gaze_masks = torch.tensor(gaze_masks, dtype=torch.float32).unsqueeze(1)
+            gaze_masks = torch.tensor(np.array(gaze_masks), dtype=torch.float32).unsqueeze(1)
             gaze_masks = self.transform.apply_image_torch(gaze_masks) # bchw format
 
         image = self.to_tensor(image)
@@ -459,7 +459,6 @@ class ResizeAndPad:
         if gaze_masks is not None:
             gaze_masks = transforms.Pad(padding)(gaze_masks)
             gaze_masks = transforms.Resize(self.target_size // 4, antialias=True)(gaze_masks)
-            gaze_masks = [gaze_mask for gaze_mask in gaze_masks.squeeze(1)]
 
         # Adjust bounding boxes
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
