@@ -6,11 +6,13 @@ dataset:
     use_embeddings: true
     prompt_types:
       - masks
+    mask_type: fixation
   val:
     root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
     use_embeddings: true
     prompt_types:
       - masks
+    mask_type: fixation
 eval_interval: 5
 save_interval: 60
 model:
