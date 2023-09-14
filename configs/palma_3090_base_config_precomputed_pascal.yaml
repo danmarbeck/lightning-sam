@@ -23,7 +23,7 @@ num_workers: 4
 num_nodes: 1
 opt:
   decay_factor: 10
-  learning_rate: 0.0008
+  learning_rate: 0.0002
   steps:
   - 1000
   - 1500
