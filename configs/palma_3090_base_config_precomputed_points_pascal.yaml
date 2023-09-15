@@ -33,4 +33,4 @@ opt:
   - 1500
   warmup_steps: 30
   weight_decay: 0.1
-out_dir: /scratch/tmp/d_beck26/sam_training/
+out_dir: /scratch/tmp/d_beck26/sam_training/five_run_eval
