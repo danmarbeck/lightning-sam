@@ -1,18 +1,18 @@
-batch_size: 24
+batch_size: 8
 dataset:
   type: cell
   train:
-    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
+    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/train
     use_embeddings: true
     prompt_types:
       - points
   val:
-    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
+    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/val
     use_embeddings: true
     prompt_types:
       - points
 eval_interval: 5
-save_interval: 60
+save_interval: 75
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
@@ -22,7 +22,7 @@ model:
     prompt_encoder: false
   type: vit_h
 num_devices: 2
-num_epochs: 180
+num_epochs: 75
 num_workers: 0
 opt:
   decay_factor: 10
@@ -30,6 +30,6 @@ opt:
   steps:
   - 1500
   - 4000
-  warmup_steps: 30
+  warmup_steps: 10
   weight_decay: 0.1
 out_dir: out/training

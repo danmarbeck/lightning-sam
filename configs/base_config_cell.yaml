@@ -2,10 +2,10 @@ batch_size: 3
 dataset:
   type: cell
   train:
-    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
+    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/train
     use_embeddings: false
   val:
-    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset
+    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/val
     use_embeddings: false
 eval_interval: 5
 save_interval: 20
@@ -26,6 +26,6 @@ opt:
   steps:
   - 1500
   - 4000
-  warmup_steps: 30
+  warmup_steps: 10
   weight_decay: 0.1
 out_dir: out/training

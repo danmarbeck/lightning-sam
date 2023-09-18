@@ -4,9 +4,15 @@ dataset:
   train:
     root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/train
     use_embeddings: true
+    prompt_types:
+      - masks
+    mask_type: gaze
   val:
     root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/val
     use_embeddings: true
+    prompt_types:
+      - masks
+    mask_type: gaze
 eval_interval: 5
 save_interval: 75
 model:
@@ -22,7 +28,7 @@ num_epochs: 75
 num_workers: 0
 opt:
   decay_factor: 10
-  learning_rate: 0.0002
+  learning_rate: 0.0008
   steps:
   - 1500
   - 4000

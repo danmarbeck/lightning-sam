@@ -283,7 +283,6 @@ class CellPose500Dataset(PascalVOCDataset):
     def __init__(self, root_dir, inference=False, transform=None, return_path=False, use_embeddings=False,
                  prompt_types: Tuple = ("boxes",), mask_type="gaussian"):
         super().__init__(root_dir, inference, transform, return_path, use_embeddings, prompt_types, mask_type)
-        self.split = "train"
 
     def _get_bbox_regex(self):
         return re.compile("\d{3}_img.png_x_min=(\d+)_x_max=(\d+)_y_min=(\d+)_y_max=(\d+)")
@@ -293,7 +292,7 @@ class CellPose500Dataset(PascalVOCDataset):
 
     def _get_image_embedding(self, image_path, image_id):
         image_embedding = pkl.load(
-            open(Path(Path(self.root_dir), "sam_embeddings", self.split, image_path.stem + ".pkl"), "rb"))
+            open(Path(Path(self.root_dir).parent, "sam_embeddings", self.split, image_path.stem + ".pkl"), "rb"))
         image_embedding = torch.tensor(image_embedding)
         return image_embedding
 
