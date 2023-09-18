@@ -2,20 +2,22 @@ batch_size: 8
 dataset:
   type: pascal
   train:
-    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
+    root_dir: /scratch/tmp/d_beck26/PascalVOC2012/VOC2012/focused_gaze/train
     use_embeddings: true
     prompt_types:
       - fixations
+      - masks
   val:
-    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
+    root_dir: /scratch/tmp/d_beck26/PascalVOC2012/VOC2012/focused_gaze/val
     use_embeddings: true
     prompt_types:
       - fixations
+      - masks
 eval_interval: 5
-save_interval: 60
+save_interval: 25
 model:
   name: PrecomputedEmbeddingModel
-  checkpoint: checkpoints/sam_vit_h_4b8939.pth
+  checkpoint: /home/d/d_beck26/lightning-sam/checkpoints/sam_vit_h_4b8939.pth
   freeze:
     image_encoder: true
     mask_decoder: false
@@ -23,13 +25,14 @@ model:
   type: vit_h
 num_devices: 2
 num_epochs: 75
-num_workers: 0
+num_workers: 4
+num_nodes: 1
 opt:
   decay_factor: 10
   learning_rate: 0.0008
   steps:
-  - 1500
-  - 4000
+  - 750
+  - 2000
   warmup_steps: 30
   weight_decay: 0.1
-out_dir: out/training
+out_dir: /scratch/tmp/d_beck26/sam_training/five_run_eval

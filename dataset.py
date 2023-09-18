@@ -85,14 +85,14 @@ class PascalVOCDataset(Dataset):
 
     def __init__(self, root_dir, inference=False, transform=None, return_path=False, use_embeddings=False,
                  prompt_types: Tuple = ("boxes",), mask_type="gaussian"):
-        self.VERSION = 1
+        self.VERSION = 2
         self.root_dir = root_dir
         self.transform = transform
         self.return_path = return_path
         self.split = Path(self.root_dir).name
         self.use_embeddings = use_embeddings
         self.inference = inference
-        assert all(prompt_type in ["boxes", "points", "masks", "fixations"] for prompt_type in prompt_types), "Invalid prompt type"
+        assert all(prompt_type in ["boxes", "points", "masks", "fixations", "gaze_points"] for prompt_type in prompt_types), "Invalid prompt type"
         assert mask_type in ["gaussian", "fixation", "fixation_duration", "gaze"], "Invalid mask type"
         self.prompt_types = prompt_types
         self.mask_type = mask_type
@@ -160,6 +160,7 @@ class PascalVOCDataset(Dataset):
                                           "fixation_duration": [],
                                           "gaze": []},
                         "fixations": [],
+                        "gaze_points": [],
                     }
                     image_dict[fileid] = r
 
@@ -181,6 +182,13 @@ class PascalVOCDataset(Dataset):
                 fixation_points = np.transpose(np.nonzero(fixation_img))
                 fixation_points = fixation_points[:, ::-1]
 
+                gaze_img = imageio.v3.imread(gaze_path)
+                if len(gaze_img.shape) == 3:
+                    gaze_img = np.sum(gaze_img, axis=2, dtype=int)
+                gaze_img = gaze_img.astype(bool)
+                gaze_points = np.transpose(np.nonzero(gaze_img))
+                gaze_points = gaze_points[:, ::-1]
+
                 image_dict[fileid]["gaze_paths"].append(str(gaze_path))
                 image_dict[fileid]["heatmap_paths"]["fixation"].append(str(hm_fixations_path))
                 image_dict[fileid]["heatmap_paths"]["fixation_duration"].append(str(hm_fixations_duration_path))
@@ -188,6 +196,7 @@ class PascalVOCDataset(Dataset):
                 image_dict[fileid]["bboxes"].append(bbox)
                 image_dict[fileid]["masks"].append(segmentation_rle_dict)
                 image_dict[fileid]["fixations"].append(fixation_points.tolist())
+                image_dict[fileid]["gaze_points"].append(gaze_points.tolist())
 
         image_dict["__version"] = self.VERSION
         yaml.dump(image_dict, open(Path(self.root_dir, "sam_dataset_info_dict.yaml"), "w"))
@@ -210,6 +219,7 @@ class PascalVOCDataset(Dataset):
             image_embedding = None
 
         fixations = image_info["fixations"]
+        gaze_points = image_info["gaze_points"]
         bboxes = image_info["bboxes"]
         masks_rle = image_info["masks"]
         masks = [pycocotools.mask.decode(rle) for rle in masks_rle]
@@ -218,6 +228,8 @@ class PascalVOCDataset(Dataset):
             all_points = [np.transpose(np.nonzero(mask)) for mask in masks]
             all_points = [points[np.random.choice(a=len(points), size=min(8, len(points)), replace=False), ::-1] for points in all_points]
             points = all_points
+        elif "gaze_points" in self.prompt_types:
+            points = gaze_points
         else:
             points = fixations
 
@@ -254,7 +266,7 @@ class PascalVOCDataset(Dataset):
             gaze_masks = np.stack(gaze_masks, axis=0)
 
         prompt_dict = {"points": None, "boxes": None, "masks": None}
-        if "points" in self.prompt_types or "fixations" in self.prompt_types:
+        if "points" in self.prompt_types or "fixations" in self.prompt_types or "gaze_points" in self.prompt_types:
             prompt_dict["points"] = points
         if "boxes" in self.prompt_types:
             prompt_dict["boxes"] = torch.tensor(bboxes)

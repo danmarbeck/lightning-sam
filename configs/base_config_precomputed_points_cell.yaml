@@ -12,7 +12,7 @@ dataset:
     prompt_types:
       - points
 eval_interval: 5
-save_interval: 75
+save_interval: 55
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
@@ -22,7 +22,7 @@ model:
     prompt_encoder: false
   type: vit_h
 num_devices: 2
-num_epochs: 75
+num_epochs: 55
 num_workers: 0
 opt:
   decay_factor: 10

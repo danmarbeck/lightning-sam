@@ -1,20 +1,18 @@
-batch_size: 12
+batch_size: 1
 dataset:
-  type: cell
+  type: pascal
   train:
-    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/train
+    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/train
     use_embeddings: true
     prompt_types:
-      - masks
-    mask_type: gaze
+      - gaze_points
   val:
-    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/val
+    root_dir: /home/daniel/data_cache/PascalVOC2012/VOC2012/focused_gaze/val
     use_embeddings: true
     prompt_types:
-      - masks
-    mask_type: gaze
+      - gaze_points
 eval_interval: 5
-save_interval: 55
+save_interval: 60
 model:
   name: PrecomputedEmbeddingModel
   checkpoint: checkpoints/sam_vit_h_4b8939.pth
@@ -24,7 +22,7 @@ model:
     prompt_encoder: false
   type: vit_h
 num_devices: 2
-num_epochs: 55
+num_epochs: 75
 num_workers: 0
 opt:
   decay_factor: 10
@@ -32,6 +30,6 @@ opt:
   steps:
   - 1500
   - 4000
-  warmup_steps: 10
+  warmup_steps: 30
   weight_decay: 0.1
 out_dir: out/training

@@ -18,7 +18,7 @@ model:
     prompt_encoder: true
   type: vit_h
 num_devices: 2
-num_epochs: 75
+num_epochs: 55
 num_workers: 4
 opt:
   decay_factor: 10
