@@ -1,4 +1,4 @@
-batch_size: 12
+batch_size: 24
 dataset:
   type: pascal
   train:
