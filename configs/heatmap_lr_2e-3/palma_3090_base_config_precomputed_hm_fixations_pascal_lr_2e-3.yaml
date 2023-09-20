@@ -23,7 +23,7 @@ model:
     mask_decoder: false
     prompt_encoder: false
   type: vit_h
-num_devices: 2
+num_devices: 4
 num_epochs: 75
 num_workers: 4
 num_nodes: 1
@@ -35,4 +35,4 @@ opt:
   - 2000
   warmup_steps: 30
   weight_decay: 0.1
-out_dir: /scratch/tmp/d_beck26/sam_training/five_run_eval
+out_dir: /scratch/tmp/d_beck26/sam_training/

@@ -1,0 +1,36 @@
+batch_size: 8
+dataset:
+  type: cell
+  train:
+    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/train
+    use_embeddings: true
+    prompt_types:
+      - points
+  val:
+    root_dir: /home/daniel/data_cache/cellpose/Cellpose_500_ready_dataset/val
+    use_embeddings: true
+    prompt_types:
+      - points
+eval_interval: 5
+save_interval: 55
+model:
+  name: PrecomputedEmbeddingModel
+  checkpoint: out/training/pascal_final_models/precomputed_points_pascal/model.pth
+  freeze:
+    image_encoder: true
+    mask_decoder: false
+    prompt_encoder: false
+  type: vit_h
+  load_new_model_type: true
+num_devices: 2
+num_epochs: 55
+num_workers: 0
+opt:
+  decay_factor: 10
+  learning_rate: 0.0002
+  steps:
+  - 1500
+  - 4000
+  warmup_steps: 10
+  weight_decay: 0.1
+out_dir: out/training
