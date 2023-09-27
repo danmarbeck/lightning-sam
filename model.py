@@ -83,9 +83,10 @@ class PrecomputedEmbeddingModel(nn.Module):
         self.full_model: Sam = None
         self.cfg = cfg
         self.inference = inference
+        self.load_new_model_type = True if self.inference else cfg.model.get("load_new_model_type", False)
 
     def setup(self):
-        self.full_model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint if not self.inference else None)
+        self.full_model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint if not self.load_new_model_type else None)
         self.prompt_encoder = self.full_model.prompt_encoder
         self.mask_decoder = self.full_model.mask_decoder
         for param in self.full_model.image_encoder.parameters():
@@ -96,7 +97,7 @@ class PrecomputedEmbeddingModel(nn.Module):
         if self.cfg.model.freeze.mask_decoder:
             for param in self.mask_decoder.parameters():
                 param.requires_grad = False
-        if self.inference:
+        if self.load_new_model_type:
             with open(self.cfg.model.checkpoint, "rb") as f:
                 state_dict = torch.load(f)
             self.load_state_dict(state_dict)

@@ -248,8 +248,9 @@ class PascalVOCDataset(Dataset):
             gaze_masks = None
 
         if self.inference:
-            original_data = (image.copy(), points.copy(), bboxes.copy(),
-                             gaze_masks.copy() if gaze_masks is not None else None,)
+            cls_list = [Path(path).parent.parent.name for path in image_info["gaze_paths"]]
+            original_data = (image_info.copy(), image.copy(),  masks.copy(), points.copy(), bboxes.copy(),
+                             gaze_masks.copy() if gaze_masks is not None else None, cls_list)
 
         if self.transform:
             image, masks, bboxes, gaze_masks, points, padding = self.transform(image, masks, np.array(bboxes), points, gaze_masks)

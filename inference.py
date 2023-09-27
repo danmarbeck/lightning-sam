@@ -1,5 +1,9 @@
 import argparse
 import pickle as pkl
+import re
+
+from PIL import Image, ImageDraw, ImageOps
+import cv2
 import segmentation_models_pytorch as smp
 from pathlib import Path
 
@@ -18,6 +22,72 @@ from predictor import SamPredictor
 import imageio
 
 torch.set_float32_matmul_precision('high')
+
+colors = [[230, 25, 75], [60, 180, 75], [255, 225, 25], [0, 130, 200], [245, 130, 48],
+                  [145, 30, 180], [70, 240, 240],[240, 50, 230], [210, 245, 60], [250, 190, 212],
+                  [0, 128, 128], [220, 190, 255], [170, 110, 40], [255, 250, 200], [128, 0, 0],
+                  [170, 255, 195], [128, 128, 0], [255, 215, 180], [0, 0, 128], [128, 128, 128],
+                  [200, 200, 25], [0, 0, 0], [0, 130, 255]]
+
+color_scheme = {'background' : 0,
+              'aeroplane' : 1,
+              'bicycle' : 2,
+              'bird' : 3,
+              'boat' : 4,
+              'bottle' : 5,
+              'bus' : 6,
+              'car' : 7,
+              'cat' : 8,
+              'chair' : 9,
+              'cow' : 10,
+              'diningtable' : 11,
+              'dog' : 12,
+              'horse' : 13,
+              'motorbike' : 14,
+              'person' : 15,
+              'pottedplant' : 16,
+              'sheep' : 17,
+              'sofa' : 18,
+              'train' : 19,
+              'tvmonitor' : 20,
+                'cells' : 22}
+
+
+def crop_from_bbox(img, bbox, zero_pad=False):
+    # Borders of image
+    bounds = (0, 0, img.shape[1] - 1, img.shape[0] - 1)
+
+    # Valid bounding box locations as (x_min, y_min, x_max, y_max)
+    bbox_valid = (max(bbox[0], bounds[0]),
+                  max(bbox[1], bounds[1]),
+                  min(bbox[2], bounds[2]),
+                  min(bbox[3], bounds[3]))
+
+    if zero_pad:
+        # Initialize crop size (first 2 dimensions)
+        crop = np.zeros((bbox[3] - bbox[1] + 1, bbox[2] - bbox[0] + 1), dtype=img.dtype)
+
+        # Offsets for x and y
+        offsets = (-bbox[0], -bbox[1])
+
+    else:
+        #assert (bbox == bbox_valid)
+        crop = np.zeros((bbox_valid[3] - bbox_valid[1] + 1, bbox_valid[2] - bbox_valid[0] + 1), dtype=img.dtype)
+        offsets = (-bbox_valid[0], -bbox_valid[1])
+
+    # Simple per element addition in the tuple
+    inds = tuple(map(sum, zip(bbox_valid, offsets + offsets)))
+
+    img = np.squeeze(img)
+    if img.ndim == 2:
+        crop[inds[1]:inds[3] + 1, inds[0]:inds[2] + 1] = \
+            img[bbox_valid[1]:bbox_valid[3] + 1, bbox_valid[0]:bbox_valid[2] + 1]
+    else:
+        crop = np.tile(crop[:, :, np.newaxis], [1, 1, 3])  # Add 3 RGB Channels
+        crop[inds[1]:inds[3] + 1, inds[0]:inds[2] + 1, :] = \
+            img[bbox_valid[1]:bbox_valid[3] + 1, bbox_valid[0]:bbox_valid[2] + 1, :]
+
+    return crop
 
 
 def show_mask(mask, ax, random_color=False):
@@ -50,9 +120,13 @@ def show_box(box, ax):
 def main(cfg: Box) -> None:
     device = torch.device("cuda:0")
 
-    out_path = cfg.out_path
+    out_path = Path(cfg.out_path)
     if out_path is None:
         out_path = Path(Path(cfg.out_dir), cfg.config_name, "predictions")
+    if args.object_based:
+        out_path = Path(out_path, "object_based")
+    else:
+        out_path = Path(out_path, "image_based")
     out_path.mkdir(parents=True, exist_ok=True)
 
     model = MODELS[cfg.model.name](cfg, inference=True)
@@ -70,12 +144,14 @@ def main(cfg: Box) -> None:
     ious = AverageMeter()
     f1_scores = AverageMeter()
 
+    rng = np.random.default_rng(4096)
+
     model.eval()
 
     with torch.no_grad():
 
         for iter, data in (pbar := tqdm(enumerate(val), total=len(val))):
-            image, prompt_input, gt_masks, image_path, (H, W), (og_image, og_points, og_bboxes, og_mask_input, padding) = data
+            image, prompt_input, gt_masks, image_path, (H, W), (image_info, og_image, og_masks, og_points, og_bboxes, og_mask_input, classes,padding) = data
             image = image.to(device=device)[None, ...]
             gt_masks = gt_masks.to(device=device)
 
@@ -128,20 +204,154 @@ def main(cfg: Box) -> None:
 
             pbar.set_description(f'Val: Mean IoU: [{ious.avg:.4f}] -- Mean F1: [{f1_scores.avg:.4f}]', refresh=True)
 
-            fig, ax = plt.subplots(figsize=(8, 4.5))
-            ax.imshow(og_image)
+            if args.object_based:
 
-            for pred_idx in range(len(masks)):
-                show_mask(masks[pred_idx].detach().cpu().numpy(), ax=ax, random_color=True)
-                if point_coords is not None:
-                    show_points(og_points[pred_idx], point_labels[pred_idx].detach().cpu().numpy(), ax=ax,)
-                if mask_input is not None:
-                    show_mask(og_mask_input[pred_idx], ax=ax, random_color=True)
-                if boxes is not None:
-                    show_box(og_bboxes[pred_idx], ax=ax)
+                for pred_idx in range(len(masks)):
+                    # calculate cropping coords etc
+                    bbox = [int(v) for v in og_bboxes[pred_idx]]
+                    bbox = [bbox[0] - 10, bbox[1] - 10, bbox[2] + 10, bbox[3] + 10]
 
-            fig.savefig(Path(out_path, Path(image_path).stem + ".png"))
-            plt.close()
+                    # original image
+                    cv_image = og_image.copy()
+                    cropped_image = crop_from_bbox(cv_image, bbox)
+                    imageio.v3.imwrite(Path(out_path, Path(image_path).stem + f"_{pred_idx}_0_orig.png"), cropped_image)
+
+                    # image_with_prediction
+                    cv_image = Image.fromarray(og_image.copy())
+                    mask = masks[pred_idx].detach().cpu().numpy().astype(np.uint8)
+                    color_cat = colors[color_scheme[classes[pred_idx]]]
+                    mask_image = np.zeros((*mask.shape, 4), dtype=np.uint8)
+                    mask_image[mask.astype(bool)] = (color_cat[0], color_cat[1], color_cat[2], 200)
+
+                    cv_image = Image.alpha_composite(cv_image.convert("RGBA"), Image.fromarray(mask_image)).convert("RGB")
+                    cv_image_draw = ImageDraw.Draw(cv_image, mode="RGBA")
+
+                    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+                    for idx, c in enumerate(contours):
+                        coordinates = []
+                        for cc in c:
+                            coordinates.append((cc[0][0], cc[0][1]))
+
+                        if len(coordinates) >= 2:
+                            cv_image_draw.polygon(coordinates, fill=None, outline='black')
+                    cropped_image = crop_from_bbox(np.asarray(cv_image, dtype=np.uint8), bbox)
+                    imageio.v3.imwrite(Path(out_path, Path(image_path).stem + f"_{pred_idx}_3_pred.png"), cropped_image)
+
+                    # image with gt
+                    cv_image = Image.fromarray(og_image.copy())
+                    mask = og_masks[pred_idx].astype(np.uint8)
+                    color_cat = colors[color_scheme[classes[pred_idx]]]
+                    mask_image = np.zeros((*mask.shape, 4), dtype=np.uint8)
+                    mask_image[mask.astype(bool)] = (color_cat[0], color_cat[1], color_cat[2], 200)
+
+                    cv_image = Image.alpha_composite(cv_image.convert("RGBA"), Image.fromarray(mask_image)).convert(
+                        "RGB")
+                    cv_image_draw = ImageDraw.Draw(cv_image, mode="RGBA")
+
+                    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+                    for idx, c in enumerate(contours):
+                        coordinates = []
+                        for cc in c:
+                            coordinates.append((cc[0][0], cc[0][1]))
+
+                        if len(coordinates) >= 2:
+                            cv_image_draw.polygon(coordinates, fill=None, outline='black')
+                    cropped_image = crop_from_bbox(np.asarray(cv_image, dtype=np.uint8), bbox)
+                    imageio.v3.imwrite(Path(out_path, Path(image_path).stem + f"_{pred_idx}_1_gt.png"),
+                                       cropped_image)
+
+                    # image with input
+                    cv_image = Image.fromarray(og_image.copy())
+
+                    if "masks" in val.prompt_types and val.mask_type == "gaussian":
+                        mask_image = np.stack([og_mask_input[pred_idx].astype(bool).astype(np.uint8)] * 3, axis=2)
+                        mask_image[np.where((mask_image == [1, 1, 1, ]).all(axis=2))] = [255, 0, 0]
+                        mask_image = np.append(mask_image, (og_mask_input[pred_idx] * 255).astype(np.uint8)[..., None], axis=2)
+                        cv_image = cv_image.convert("RGBA")
+                        cv_image.alpha_composite(Image.fromarray(mask_image))
+                        cv_image = cv_image.convert("RGB")
+                    elif "masks" in val.prompt_types:
+                        mask_path = Path(image_info["heatmap_paths"][val.mask_type][pred_idx])
+                        mask_image_path = Path(mask_path.parent.parent, re.sub('_mask', "", mask_path.parent.name),
+                                               mask_path.stem)
+                        mask_image = imageio.v3.imread(mask_image_path)
+                        if mask_image.shape != cv_image.size[::-1]:
+                            mask_image = np.array(ImageOps.pad(Image.fromarray(mask_image), cv_image.size))
+                        cv_image = Image.fromarray(mask_image)
+                        cv_image = cv_image.convert("RGB")
+                    cv_image_draw = ImageDraw.Draw(cv_image, mode="RGBA")
+                    if "points" in val.prompt_types or "fixations" in val.prompt_types:
+
+                        points = og_points[pred_idx]
+                        for point in points:
+                            cv_image_draw.ellipse([int(point[0]) - 2, int(point[1]) - 2, int(point[0]) + 2, int(point[1]) + 2],
+                                                  fill=(255, 0, 0, 255), outline="red")
+                    if "boxes" in val.prompt_types:
+                        og_bbox = [int(v) for v in og_bboxes[pred_idx]]
+
+                        cv_image_draw.rectangle(og_bbox, fill=(0,0,0,0), outline="red", width=3)
+
+                    cropped_image = crop_from_bbox(np.asarray(cv_image, dtype=np.uint8), bbox)
+                    imageio.v3.imwrite(Path(out_path, Path(image_path).stem + f"_{pred_idx}_2_input.png"),
+                                       cropped_image)
+            else:
+                #  plot whole images and all their objects
+                cv_image = Image.fromarray(og_image.copy())
+
+                for pred_idx in range(len(masks)):
+                    # draw prediction
+                    mask = masks[pred_idx].detach().cpu().numpy().astype(np.uint8)
+                    color_cat = colors[color_scheme[classes[pred_idx]]]
+                    mask_image = np.zeros((*mask.shape, 4), dtype=np.uint8)
+                    mask_image[mask.astype(bool)] = (color_cat[0], color_cat[1], color_cat[2], 200)
+
+                    cv_image = Image.alpha_composite(cv_image.convert("RGBA"), Image.fromarray(mask_image)).convert(
+                        "RGB")
+                    cv_image_draw = ImageDraw.Draw(cv_image, mode="RGBA")
+
+                    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+                    for idx, c in enumerate(contours):
+                        coordinates = []
+                        for cc in c:
+                            coordinates.append((cc[0][0], cc[0][1]))
+
+                        if len(coordinates) >= 2:
+                            cv_image_draw.polygon(coordinates, fill=None, outline='black')
+
+                    # draw input
+                    if "masks" in val.prompt_types and val.mask_type == "gaussian":
+                        mask_image = np.stack([og_mask_input[pred_idx].astype(bool).astype(np.uint8)] * 3, axis=2)
+                        mask_image[np.where((mask_image == [1, 1, 1, ]).all(axis=2))] = [255, 0, 0]
+                        mask_image = np.append(mask_image, (og_mask_input[pred_idx] * 255).astype(np.uint8)[..., None], axis=2)
+                        cv_image = cv_image.convert("RGBA")
+                        cv_image.alpha_composite(Image.fromarray(mask_image))
+                        cv_image = cv_image.convert("RGB")
+                    elif "masks" in val.prompt_types:
+                        mask_path = Path(image_info["heatmap_paths"][val.mask_type][pred_idx])
+                        mask_image_path = Path(mask_path.parent.parent, re.sub('_mask', "", mask_path.parent.name),
+                                               mask_path.stem)
+                        mask_image = imageio.v3.imread(mask_image_path)
+                        if mask_image.shape != cv_image.size[::-1]:
+                            mask_image = np.array(ImageOps.pad(Image.fromarray(mask_image), cv_image.size))
+                        cv_image = Image.fromarray(mask_image)
+                        cv_image = cv_image.convert("RGB")
+                    cv_image_draw = ImageDraw.Draw(cv_image, mode="RGBA")
+                    if "points" in val.prompt_types or "fixations" in val.prompt_types:
+
+                        points = og_points[pred_idx]
+                        for point in points:
+                            cv_image_draw.ellipse([int(point[0]) - 4, int(point[1]) - 4, int(point[0]) + 4, int(point[1]) + 4],
+                                                  fill=(*color_cat, 255), outline="white")
+                    if "boxes" in val.prompt_types:
+                        og_bbox = [int(v) for v in og_bboxes[pred_idx]]
+
+                        cv_image_draw.rectangle(og_bbox, fill=(0,0,0,0), outline="red")
+                imageio.v3.imwrite(Path(out_path, Path(image_path).stem + ".png"), np.asarray(cv_image))
+
+
 
 
 if __name__ == "__main__":
@@ -152,6 +362,8 @@ if __name__ == "__main__":
                         help="Path to .yaml file containing the config.")
     parser.add_argument("--out_path", default=None,
                         help="Path to output_folder for the predictions. If None, model location is used.")
+    parser.add_argument("--object_based", action="store_true",
+                        help="if set, store images for each object.")
     parser.add_argument("--model_path", "-m", type=str, help="Path to the model used for inference."
                                                              " Must match the provided config in terms of model type.")
 
