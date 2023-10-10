@@ -2,7 +2,7 @@ import argparse
 import pickle as pkl
 import re
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageOps, ImageEnhance
 import cv2
 import segmentation_models_pytorch as smp
 from pathlib import Path
@@ -264,6 +264,8 @@ def main(cfg: Box) -> None:
 
                     # image with input
                     cv_image = Image.fromarray(og_image.copy())
+                    enhancer = ImageEnhance.Brightness(cv_image)
+                    cv_image = enhancer.enhance(0.3)
 
                     if "masks" in val.prompt_types and val.mask_type == "gaussian":
                         mask_image = np.stack([og_mask_input[pred_idx].astype(bool).astype(np.uint8)] * 3, axis=2)

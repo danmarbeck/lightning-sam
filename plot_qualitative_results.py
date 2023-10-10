@@ -101,5 +101,5 @@ if __name__ == '__main__':
 
     args = None
 
-    # plot_input_comparison(args)
-    plot_full_images(args)
+    plot_input_comparison(args)
+    # plot_full_images(args)
